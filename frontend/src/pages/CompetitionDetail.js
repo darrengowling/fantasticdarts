@@ -31,8 +31,19 @@ export default function CompetitionDetail() {
   const loadCompetition = async () => {
     try {
       const response = await axios.get(`${BACKEND_URL}/darts/competitions/${id}`);
-      setCompetition(response.data);
-      setParticipants(response.data.participants || []);
+      const competitionData = response.data;
+      
+      // Try to fetch auction for this competition
+      try {
+        const auctionResponse = await axios.get(`${BACKEND_URL}/darts/competitions/${id}/auction`);
+        competitionData.auctionId = auctionResponse.data.id;
+      } catch (auctionError) {
+        // Auction doesn't exist yet, that's OK
+        console.log("No auction found for competition (this is OK if not started yet)");
+      }
+      
+      setCompetition(competitionData);
+      setParticipants(competitionData.participants || []);
       setLoading(false);
     } catch (e) {
       console.error("Error loading competition:", e);

@@ -185,7 +185,7 @@ class UserScore(BaseModel):
 class DartsAuction(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     competitionId: str
-    status: str = "pending"  # pending, active, paused, completed
+    status: str = "pending"  # pending, waiting, active, paused, completed
     currentLot: int = 0
     currentPlayerId: Optional[str] = None
     currentLotId: Optional[str] = None

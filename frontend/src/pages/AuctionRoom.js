@@ -192,6 +192,17 @@ export default function AuctionRoom() {
       loadAuction(); // Reload to show resumed state
     };
 
+    const handleAuctionWaiting = (data) => {
+      console.log("Auction waiting:", data);
+      loadAuction(); // Reload to show waiting state
+    };
+
+    const handleBiddingStarted = (data) => {
+      console.log("Bidding started:", data);
+      alert(`🚀 ${data.message}`);
+      loadAuction(); // Reload to show active state
+    };
+
     const handleDisconnect = () => {
       console.log("Socket disconnected");
     };
@@ -209,6 +220,8 @@ export default function AuctionRoom() {
     socket.off("auction_complete", handleAuctionComplete);
     socket.off("auction_paused", handleAuctionPaused);
     socket.off("auction_resumed", handleAuctionResumed);
+    socket.off("auction_waiting", handleAuctionWaiting);
+    socket.off("bidding_started", handleBiddingStarted);
     socket.off("disconnect", handleDisconnect);
 
     // Add listeners
@@ -224,6 +237,8 @@ export default function AuctionRoom() {
     socket.on("auction_complete", handleAuctionComplete);
     socket.on("auction_paused", handleAuctionPaused);
     socket.on("auction_resumed", handleAuctionResumed);
+    socket.on("auction_waiting", handleAuctionWaiting);
+    socket.on("bidding_started", handleBiddingStarted);
     socket.on("disconnect", handleDisconnect);
 
     // Store cleanup function
@@ -239,6 +254,8 @@ export default function AuctionRoom() {
       socket.off("auction_complete", handleAuctionComplete);
       socket.off("auction_paused", handleAuctionPaused);
       socket.off("auction_resumed", handleAuctionResumed);
+      socket.off("auction_waiting", handleAuctionWaiting);
+      socket.off("bidding_started", handleBiddingStarted);
       socket.off("disconnect", handleDisconnect);
     };
   };
@@ -628,15 +645,61 @@ export default function AuctionRoom() {
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <div className="text-6xl mb-4">⏳</div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                    {auction?.status === "completed" ? "Auction Complete!" : "Loading Next Player..."}
-                  </h2>
-                  <p className="text-gray-600">
-                    {auction?.status === "completed" 
-                      ? "All players have been auctioned. Check the standings!" 
-                      : "Players auto-load in random order. Next player starting soon..."}
-                  </p>
+                  {auction?.status === "waiting" ? (
+                    // Waiting Room
+                    <div>
+                      <div className="text-6xl mb-4">👥</div>
+                      <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                        Waiting Room
+                      </h2>
+                      <p className="text-gray-600 mb-6">
+                        {isCommissioner 
+                          ? "All participants are gathering. Click below when everyone is ready!" 
+                          : "Waiting for commissioner to begin bidding..."}
+                      </p>
+                      {isCommissioner && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await axios.post(`${BACKEND_URL}/darts/auctions/${auctionId}/begin`, {
+                                userId: user.id
+                              });
+                            } catch (e) {
+                              console.error("Error beginning bidding:", e);
+                              alert("Error beginning bidding: " + (e.response?.data?.detail || e.message));
+                            }
+                          }}
+                          className="bg-green-600 text-white px-8 py-4 rounded-lg hover:bg-green-700 font-bold text-xl shadow-lg"
+                        >
+                          🚀 Begin Bidding
+                        </button>
+                      )}
+                      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-700">
+                        <div className="font-semibold mb-2">Participants in room:</div>
+                        <div className="space-y-1">
+                          {participants.map((p) => (
+                            <div key={p.userId} className="flex items-center justify-center gap-2">
+                              <span className="text-green-500">✓</span>
+                              <span>{p.userName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // Other states (completed, loading)
+                    <div>
+                      <div className="text-6xl mb-4">⏳</div>
+                      <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                        {auction?.status === "completed" ? "Auction Complete!" : "Loading Next Player..."}
+                      </h2>
+                      <p className="text-gray-600">
+                        {auction?.status === "completed" 
+                          ? "All players have been auctioned. Check the standings!" 
+                          : "Players auto-load in random order. Next player starting soon..."}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

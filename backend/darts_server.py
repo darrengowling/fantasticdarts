@@ -561,7 +561,7 @@ async def get_auction(auction_id: str):
 
 @api_router.post("/darts/auctions/{auction_id}/start")
 async def start_auction(auction_id: str, commissioner_data: dict):
-    """Start the auction (commissioner only)"""
+    """Start the auction waiting room (commissioner only)"""
     try:
         user_id = commissioner_data.get("userId")
         logger.info(f"Starting auction {auction_id} by user {user_id}")
@@ -581,7 +581,53 @@ async def start_auction(auction_id: str, commissioner_data: dict):
         if auction["status"] != "pending":
             raise HTTPException(status_code=400, detail="Auction already started")
         
-        # Update auction status
+        # Update auction status to waiting
+        logger.info("Updating auction status to waiting")
+        await db.auctions.update_one(
+            {"id": auction_id},
+            {"$set": {"status": "waiting"}}
+        )
+        
+        logger.info(f"Auction {auction_id} moved to waiting room")
+        
+        # Emit to all participants that auction is now in waiting room
+        await sio.emit('auction_waiting', {
+            "auctionId": auction_id,
+            "competitionId": auction["competitionId"],
+            "message": "Waiting for commissioner to begin bidding..."
+        }, room=f"auction_{auction_id}")
+        
+        return {"success": True, "message": "Auction waiting room started"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting auction {auction_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to start auction: {str(e)}")
+
+@api_router.post("/darts/auctions/{auction_id}/begin")
+async def begin_bidding(auction_id: str, commissioner_data: dict):
+    """Begin bidding - transition from waiting to active (commissioner only)"""
+    try:
+        user_id = commissioner_data.get("userId")
+        logger.info(f"Beginning bidding for auction {auction_id} by user {user_id}")
+        
+        # Get auction
+        auction = await db.auctions.find_one({"id": auction_id})
+        if not auction:
+            raise HTTPException(status_code=404, detail="Auction not found")
+        
+        logger.info(f"Auction found, status: {auction['status']}")
+        
+        # Verify commissioner
+        competition = await db.competitions.find_one({"id": auction["competitionId"]})
+        if not competition or competition["commissionerId"] != user_id:
+            raise HTTPException(status_code=403, detail="Only commissioner can begin bidding")
+        
+        if auction["status"] != "waiting":
+            raise HTTPException(status_code=400, detail=f"Auction must be in waiting status (currently: {auction['status']})")
+        
+        # Update auction status to active
         logger.info("Updating auction status to active")
         await db.auctions.update_one(
             {"id": auction_id},
@@ -594,21 +640,22 @@ async def start_auction(auction_id: str, commissioner_data: dict):
             logger.info(f"Starting first lot for player {first_player_id}")
             await start_lot(auction_id, first_player_id)
         
-        logger.info(f"Started auction {auction_id}")
+        logger.info(f"Bidding started for auction {auction_id}")
         
-        # Emit to all participants
-        await sio.emit('auction_started', {
+        # Emit to all participants that bidding has begun
+        await sio.emit('bidding_started', {
             "auctionId": auction_id,
-            "competitionId": auction["competitionId"]
+            "competitionId": auction["competitionId"],
+            "message": "Bidding has begun!"
         }, room=f"auction_{auction_id}")
         
-        return {"success": True, "message": "Auction started"}
+        return {"success": True, "message": "Bidding started"}
     
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error starting auction {auction_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to start auction: {str(e)}")
+        logger.error(f"Error beginning bidding for auction {auction_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to begin bidding: {str(e)}")
 
 @api_router.post("/darts/auctions/{auction_id}/pause")
 async def pause_auction(auction_id: str, commissioner_data: dict):

@@ -675,92 +675,92 @@ async def place_bid(auction_id: str, bid_input: DartsBidCreate):
         auction = await db.auctions.find_one({"id": auction_id})
         if not auction:
             raise HTTPException(status_code=404, detail="Auction not found")
-    
-    if auction["status"] != "active":
-        raise HTTPException(status_code=400, detail="Auction is not active")
-    
-    # Verify player matches current lot
-    if bid_input.playerId != auction.get("currentPlayerId"):
-        raise HTTPException(status_code=400, detail="Bid is for wrong player")
-    
-    # Get user and verify budget
-    squad = await db.user_squads.find_one({
-        "competitionId": auction["competitionId"],
-        "userId": bid_input.userId
-    })
-    
-    if not squad:
-        raise HTTPException(status_code=404, detail="User squad not found")
-    
-    if bid_input.amount > squad["budgetRemaining"]:
-        raise HTTPException(status_code=400, detail="Insufficient budget")
-    
-    # Get current highest bid
-    highest_bid = await db.bids.find_one({
-        "auctionId": auction_id,
-        "playerId": bid_input.playerId
-    }, sort=[("amount", -1)])
-    
-    # Validate bid amount (must be higher than current)
-    min_bid = highest_bid["amount"] + 1000 if highest_bid else 1000
-    if bid_input.amount < min_bid:
-        raise HTTPException(status_code=400, detail=f"Bid must be at least {min_bid}")
-    
-    # Check if user is bidding against themselves
-    if highest_bid and highest_bid["userId"] == bid_input.userId:
-        raise HTTPException(status_code=400, detail="You already have the highest bid")
-    
-    # Get user details
-    user = await db.users.find_one({"id": bid_input.userId})
-    
-    # Create bid
-    bid_obj = DartsBid(
-        auctionId=auction_id,
-        userId=bid_input.userId,
-        playerId=bid_input.playerId,
-        amount=bid_input.amount,
-        userName=user["name"] if user else None,
-        userEmail=user["email"] if user else None
-    )
-    
-    await db.bids.insert_one(bid_obj.model_dump())
-    
-    logger.info(f"Bid placed: {bid_input.amount} by {user['name'] if user else bid_input.userId}")
-    
-    # Anti-snipe logic: extend timer if bid in last X seconds
-    timer_ends_at = auction["timerEndsAt"]
-    if isinstance(timer_ends_at, datetime) and timer_ends_at.tzinfo is None:
-        timer_ends_at = timer_ends_at.replace(tzinfo=timezone.utc)
-    
-    time_remaining = (timer_ends_at - datetime.now(timezone.utc)).total_seconds()
-    if time_remaining < auction["antiSnipeSeconds"]:
-        new_end_time = datetime.now(timezone.utc) + timedelta(seconds=auction["antiSnipeSeconds"])
         
-        await db.auctions.update_one(
-            {"id": auction_id},
-            {"$set": {"timerEndsAt": new_end_time}}
+        if auction["status"] != "active":
+            raise HTTPException(status_code=400, detail="Auction is not active")
+        
+        # Verify player matches current lot
+        if bid_input.playerId != auction.get("currentPlayerId"):
+            raise HTTPException(status_code=400, detail="Bid is for wrong player")
+        
+        # Get user and verify budget
+        squad = await db.user_squads.find_one({
+            "competitionId": auction["competitionId"],
+            "userId": bid_input.userId
+        })
+        
+        if not squad:
+            raise HTTPException(status_code=404, detail="User squad not found")
+        
+        if bid_input.amount > squad["budgetRemaining"]:
+            raise HTTPException(status_code=400, detail="Insufficient budget")
+        
+        # Get current highest bid
+        highest_bid = await db.bids.find_one({
+            "auctionId": auction_id,
+            "playerId": bid_input.playerId
+        }, sort=[("amount", -1)])
+        
+        # Validate bid amount (must be higher than current)
+        min_bid = highest_bid["amount"] + 1000 if highest_bid else 1000
+        if bid_input.amount < min_bid:
+            raise HTTPException(status_code=400, detail=f"Bid must be at least {min_bid}")
+        
+        # Check if user is bidding against themselves
+        if highest_bid and highest_bid["userId"] == bid_input.userId:
+            raise HTTPException(status_code=400, detail="You already have the highest bid")
+        
+        # Get user details
+        user = await db.users.find_one({"id": bid_input.userId})
+        
+        # Create bid
+        bid_obj = DartsBid(
+            auctionId=auction_id,
+            userId=bid_input.userId,
+            playerId=bid_input.playerId,
+            amount=bid_input.amount,
+            userName=user["name"] if user else None,
+            userEmail=user["email"] if user else None
         )
         
-        # Cancel old timer and start new one
-        if auction_id in active_timers:
-            active_timers[auction_id].cancel()
+        await db.bids.insert_one(bid_obj.model_dump())
         
-        lot_id = auction.get("currentLotId")
-        asyncio.create_task(countdown_timer(auction_id, new_end_time, lot_id))
+        logger.info(f"Bid placed: {bid_input.amount} by {user['name'] if user else bid_input.userId}")
         
-        logger.info(f"Anti-snipe triggered: timer extended to {new_end_time}")
-    
-    # Emit bid event
-    await sio.emit('new_bid', {
-        "auctionId": auction_id,
-        "playerId": bid_input.playerId,
-        "amount": bid_input.amount,
-        "userId": bid_input.userId,
-        "userName": user["name"] if user else "Unknown"
-    }, room=f"auction_{auction_id}")
-    
-    return bid_obj
-    
+        # Anti-snipe logic: extend timer if bid in last X seconds
+        timer_ends_at = auction["timerEndsAt"]
+        if isinstance(timer_ends_at, datetime) and timer_ends_at.tzinfo is None:
+            timer_ends_at = timer_ends_at.replace(tzinfo=timezone.utc)
+        
+        time_remaining = (timer_ends_at - datetime.now(timezone.utc)).total_seconds()
+        if time_remaining < auction["antiSnipeSeconds"]:
+            new_end_time = datetime.now(timezone.utc) + timedelta(seconds=auction["antiSnipeSeconds"])
+            
+            await db.auctions.update_one(
+                {"id": auction_id},
+                {"$set": {"timerEndsAt": new_end_time}}
+            )
+            
+            # Cancel old timer and start new one
+            if auction_id in active_timers:
+                active_timers[auction_id].cancel()
+            
+            lot_id = auction.get("currentLotId")
+            asyncio.create_task(countdown_timer(auction_id, new_end_time, lot_id))
+            
+            logger.info(f"Anti-snipe triggered: timer extended to {new_end_time}")
+        
+        # Emit bid event
+        await sio.emit('new_bid', {
+            "auctionId": auction_id,
+            "playerId": bid_input.playerId,
+            "amount": bid_input.amount,
+            "userId": bid_input.userId,
+            "userName": user["name"] if user else "Unknown"
+        }, room=f"auction_{auction_id}")
+        
+        return bid_obj
+        
     except HTTPException:
         raise
     except Exception as e:

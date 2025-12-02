@@ -86,6 +86,34 @@ def create_timer_event(lot_id: str, ends_at_ms: int) -> dict:
         "serverNow": int(time.time() * 1000)
     }
 
+def sanitize_mongo_doc(doc):
+    """Remove MongoDB-specific fields that can't be JSON serialized"""
+    from datetime import datetime
+    from bson import ObjectId
+    
+    if doc is None:
+        return None
+    
+    if isinstance(doc, dict):
+        # Clean each key/value pair
+        clean_doc = {}
+        for k, v in doc.items():
+            if k == '_id':
+                continue  # Skip _id field
+            elif isinstance(v, ObjectId):
+                clean_doc[k] = str(v)
+            elif isinstance(v, datetime):
+                clean_doc[k] = v.isoformat()
+            elif isinstance(v, dict):
+                clean_doc[k] = sanitize_mongo_doc(v)
+            elif isinstance(v, list):
+                clean_doc[k] = [sanitize_mongo_doc(item) if isinstance(item, dict) else item for item in v]
+            else:
+                clean_doc[k] = v
+        return clean_doc
+    
+    return doc
+
 # ===== USER ENDPOINTS =====
 
 @api_router.post("/users", response_model=User)
@@ -746,7 +774,7 @@ async def start_lot(auction_id: str, player_id: str):
     await sio.emit('lot_started', {
         "auctionId": auction_id,
         "lotId": lot_id,
-        "player": player,
+        "player": sanitize_mongo_doc(player),
         "endsAt": int(end_time.timestamp() * 1000)
     }, room=f"auction_{auction_id}")
 
@@ -975,9 +1003,13 @@ async def join_auction(sid, data):
     logger.info(f"User {user_id} joined auction {auction_id}")
     
     # Send current auction state
+    current_player = None
+    if auction.get("currentPlayerId"):
+        current_player = await db.players.find_one({"id": auction.get("currentPlayerId")})
+    
     await sio.emit('auction_state', {
-        "auction": auction,
-        "currentPlayer": await db.players.find_one({"id": auction.get("currentPlayerId")}) if auction.get("currentPlayerId") else None
+        "auction": sanitize_mongo_doc(auction),
+        "currentPlayer": sanitize_mongo_doc(current_player)
     }, room=sid)
 
 @sio.event
@@ -1032,4 +1064,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(socket_app, host="0.0.0.0", port=8001)

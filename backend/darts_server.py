@@ -728,7 +728,11 @@ async def place_bid(auction_id: str, bid_input: DartsBidCreate):
     logger.info(f"Bid placed: {bid_input.amount} by {user['name'] if user else bid_input.userId}")
     
     # Anti-snipe logic: extend timer if bid in last X seconds
-    time_remaining = (auction["timerEndsAt"] - datetime.now(timezone.utc)).total_seconds()
+    timer_ends_at = auction["timerEndsAt"]
+    if isinstance(timer_ends_at, datetime) and timer_ends_at.tzinfo is None:
+        timer_ends_at = timer_ends_at.replace(tzinfo=timezone.utc)
+    
+    time_remaining = (timer_ends_at - datetime.now(timezone.utc)).total_seconds()
     if time_remaining < auction["antiSnipeSeconds"]:
         new_end_time = datetime.now(timezone.utc) + timedelta(seconds=auction["antiSnipeSeconds"])
         

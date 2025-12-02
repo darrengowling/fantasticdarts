@@ -333,13 +333,14 @@ export default function AuctionRoom() {
     try {
       await axios.post(`${BACKEND_URL}/darts/auctions/${auctionId}/bid`, {
         userId: user.id,
-        clubId: currentPlayer.id,
+        playerId: currentPlayer.id,
         amount,
       });
       setBidAmount("");
     } catch (e) {
       console.error("Error placing bid:", e);
-      alert(e.response?.data?.detail || "Error placing bid");
+      const errorMessage = e.response?.data?.detail || e.message || "Error placing bid";
+      alert(errorMessage);
     }
   };
 

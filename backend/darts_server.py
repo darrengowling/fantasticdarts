@@ -861,6 +861,9 @@ async def start_next_lot(auction_id: str):
 async def countdown_timer(auction_id: str, end_time: datetime, lot_id: str):
     """Countdown timer for auction lot"""
     try:
+        # Store reference to active timer at the start
+        active_timers[auction_id] = asyncio.current_task()
+        
         while datetime.now(timezone.utc) < end_time:
             await asyncio.sleep(1)
             
@@ -886,9 +889,10 @@ async def countdown_timer(auction_id: str, end_time: datetime, lot_id: str):
         logger.info(f"Timer task cancelled for auction {auction_id}")
     except Exception as e:
         logger.error(f"Error in countdown timer: {e}")
-
-# Store reference to active timer
-active_timers[auction_id] = asyncio.current_task()
+    finally:
+        # Clean up timer reference
+        if auction_id in active_timers:
+            del active_timers[auction_id]
 
 # ===== PIGGYBACK & WILDCARD ENDPOINTS =====
 
@@ -1007,7 +1011,7 @@ async def leave_competition(sid, data):
         logger.info(f"Client {sid} left competition {competition_id}")
 
 # Mount the API router
-app.add_router(api_router)
+app.include_router(api_router)
 
 # Add CORS middleware
 app.add_middleware(

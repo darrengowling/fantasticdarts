@@ -308,7 +308,7 @@ export default function AuctionRoom() {
     }
   };
 
-  const startLot = async (clubId) => {
+  const startLot = async (playerId) => {
     try {
       await axios.post(`${BACKEND_URL}/darts/auctions/${auctionId}/start-lot/${playerId}`);
       setSelectedPlayerForLot(null);

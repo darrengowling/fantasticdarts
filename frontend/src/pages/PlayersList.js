@@ -164,7 +164,7 @@ function getCountryFlag(country) {
     Italy: "🇮🇹",
     Portugal: "🇵🇹",
     Brazil: "🇧🇷",
-    South Africa: "🇿🇦",
+    "South Africa": "🇿🇦"
   };
   return flags[country] || "🎯";
 }

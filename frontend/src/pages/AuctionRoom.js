@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import io from "socket.io-client";
 import { useAuctionClock } from "../hooks/useAuctionClock";
+import PlayerCard from "../components/PlayerCard";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:8001";
@@ -423,7 +424,7 @@ export default function AuctionRoom() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-darts-bg-900 via-darts-bg-800 to-darts-dark-900 flex items-center justify-center">
         <div className="text-white text-2xl">Loading auction...</div>
       </div>
     );
@@ -441,27 +442,33 @@ export default function AuctionRoom() {
   const highestBid = currentPlayerBids.length > 0 ? Math.max(...currentPlayerBids.map((b) => b.amount)) : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-darts-bg-900 via-darts-bg-800 to-darts-dark-900 py-8">
       <div className="container mx-auto px-4">
         <div className="max-w-6xl mx-auto">
           <button
             onClick={() => navigate("/")}
-            className="text-white hover:underline mb-4"
+            className="text-white hover:text-darts-gold-500 transition-colors mb-4 flex items-center gap-2 font-semibold"
           >
             ← Back to Home
           </button>
 
           {/* Auction Header */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <div className="bg-gradient-to-r from-darts-dark-800 to-darts-dark-900 rounded-xl shadow-2xl p-6 mb-6 border-2 border-darts-dark-700">
             <div className="flex justify-between items-center">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">
+                <h1 className="text-4xl font-bold text-white uppercase tracking-tight">
                   {competition ? competition.name : "Auction Room"}
                 </h1>
-                <p className="text-gray-600">
-                  Lot #{auction?.currentLot || 0} • Status: {auction?.status || "Unknown"}
+                <p className="text-gray-300 font-semibold mt-2">
+                  Lot #{auction?.currentLot || 0} • Status: <span className="text-darts-gold-500">{auction?.status || "Unknown"}</span>
                   {auction?.status === "paused" && (
-                    <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-sm rounded">PAUSED</span>
+                    <span className="ml-2 px-3 py-1 bg-darts-gold-500 text-darts-dark-900 text-sm rounded-full font-bold">PAUSED</span>
+                  )}
+                  {auction?.status === "waiting" && (
+                    <span className="ml-2 px-3 py-1 bg-darts-green-500 text-white text-sm rounded-full font-bold">WAITING</span>
+                  )}
+                  {auction?.status === "active" && (
+                    <span className="ml-2 px-3 py-1 bg-darts-red-500 text-white text-sm rounded-full font-bold animate-pulse">LIVE</span>
                   )}
                 </p>
               </div>
@@ -510,30 +517,47 @@ export default function AuctionRoom() {
           </div>
 
           {/* Participant Budgets */}
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-xl font-bold mb-4 text-gray-900">Manager Budgets</h2>
+          <div className="bg-gradient-to-r from-darts-dark-800 to-darts-dark-900 rounded-xl shadow-2xl p-6 mb-6 border-2 border-darts-dark-700">
+            <h2 className="text-2xl font-bold mb-4 text-white uppercase tracking-wide">Manager Budgets</h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
               {participants.map((p) => {
                 const isCurrentUser = user && p.userId === user.id;
+                const budgetPercent = (p.budgetRemaining / 100000) * 100;
+                
                 return (
                   <div
                     key={p.userId}
-                    className={`p-4 rounded-lg border-2 ${
+                    className={`p-5 rounded-xl border-2 transform transition-all duration-200 ${
                       isCurrentUser
-                        ? "bg-blue-50 border-blue-500"
-                        : "bg-gray-50 border-gray-200"
+                        ? "bg-gradient-to-br from-darts-gold-600 to-darts-gold-700 border-darts-gold-500 shadow-xl scale-105"
+                        : "bg-darts-bg-800 border-darts-dark-700 hover:border-darts-dark-600"
                     }`}
                   >
-                    <div className="font-semibold text-gray-900 text-sm mb-1">
-                      {p.userName} {isCurrentUser && "(You)"}
+                    <div className={`font-bold text-sm mb-2 ${isCurrentUser ? 'text-white' : 'text-gray-300'}`}>
+                      {p.userName} {isCurrentUser && "⭐"}
                     </div>
-                    <div className="text-2xl font-bold text-green-600">
+                    <div className={`text-3xl font-bold ${isCurrentUser ? 'text-white' : 'text-darts-green-500'}`}>
                       £{p.budgetRemaining.toLocaleString()}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    
+                    {/* Budget progress bar */}
+                    <div className="mt-3 mb-2">
+                      <div className="h-2 bg-darts-dark-900 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all duration-500 ${
+                            budgetPercent > 50 ? 'bg-darts-green-500' : 
+                            budgetPercent > 25 ? 'bg-darts-gold-500' : 
+                            'bg-darts-red-500'
+                          }`}
+                          style={{ width: `${budgetPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className={`text-xs mt-2 ${isCurrentUser ? 'text-white/90' : 'text-gray-400'}`}>
                       Spent: £{p.totalSpent.toLocaleString()}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className={`text-xs ${isCurrentUser ? 'text-white/90' : 'text-gray-400'}`}>
                       Players: {p.playersWon.length}
                     </div>
                   </div>
@@ -549,32 +573,40 @@ export default function AuctionRoom() {
                 <div>
                   <h2 className="text-2xl font-bold mb-4 text-gray-900">Current Lot</h2>
                   
-                  {/* Timer */}
-                  <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white p-6 rounded-lg mb-6 text-center">
-                    <div className="text-5xl font-bold">
-                      <span data-testid="auction-timer">
-                        {(() => {
-                          const s = Math.ceil((remainingMs ?? 0) / 1000);
-                          const mm = String(Math.floor(s / 60)).padStart(2, "0");
-                          const ss = String(s % 60).padStart(2, "0");
-                          return `${mm}:${ss}`;
-                        })()}
-                      </span>
-                    </div>
-                    <div className="text-sm mt-2">Time Remaining</div>
-                  </div>
+                  {/* Timer with urgency states */}
+                  {(() => {
+                    const s = Math.ceil((remainingMs ?? 0) / 1000);
+                    const mm = String(Math.floor(s / 60)).padStart(2, "0");
+                    const ss = String(s % 60).padStart(2, "0");
+                    
+                    // Determine urgency state
+                    let timerClass = 'bg-darts-green-600 border-darts-green-700'; // Calm (20-30s)
+                    let animation = '';
+                    
+                    if (s < 10) {
+                      // Urgent: Red with fast pulse
+                      timerClass = 'bg-darts-red-600 border-darts-red-700';
+                      animation = 'animate-pulse-fast';
+                    } else if (s < 20) {
+                      // Warning: Gold with slow pulse
+                      timerClass = 'bg-darts-gold-500 border-darts-gold-600';
+                      animation = 'animate-pulse-slow';
+                    }
+                    
+                    return (
+                      <div className={`${timerClass} ${animation} text-white p-8 rounded-xl mb-6 text-center border-4 shadow-2xl transition-all duration-300`}>
+                        <div className="text-7xl font-bold tracking-wider" data-testid="auction-timer">
+                          {mm}:{ss}
+                        </div>
+                        <div className="text-lg font-semibold mt-3 uppercase tracking-wide">
+                          {s < 10 ? '🔥 FINAL SECONDS!' : s < 20 ? '⚠️ HURRY!' : '⏱️ Time Remaining'}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
-                  {/* Player Info */}
-                  <div className="bg-gray-50 p-6 rounded-lg mb-6">
-                    <h3 className="text-3xl font-bold text-gray-900 mb-2">{currentPlayer.name}</h3>
-                    <p className="text-xl text-gray-600">{currentPlayer.nationality}</p>
-                    {currentPlayer.pdcRanking && (
-                      <p className="text-sm text-gray-500 mt-2">PDC Ranking: #{currentPlayer.pdcRanking}</p>
-                    )}
-                    {currentPlayer.seed && (
-                      <p className="text-sm text-gray-500">Seed: #{currentPlayer.seed}</p>
-                    )}
-                  </div>
+                  {/* Player Info Card */}
+                  <PlayerCard player={currentPlayer} className="mb-6" />
 
                   {/* Current Highest Bid */}
                   {highestBid > 0 && (
@@ -646,44 +678,94 @@ export default function AuctionRoom() {
               ) : (
                 <div className="text-center py-12">
                   {auction?.status === "waiting" ? (
-                    // Waiting Room
-                    <div>
-                      <div className="text-6xl mb-4">👥</div>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                        Waiting Room
-                      </h2>
-                      <p className="text-gray-600 mb-6">
-                        {isCommissioner 
-                          ? "All participants are gathering. Click below when everyone is ready!" 
-                          : "Waiting for commissioner to begin bidding..."}
-                      </p>
-                      {isCommissioner && (
-                        <button
-                          onClick={async () => {
-                            try {
-                              await axios.post(`${BACKEND_URL}/darts/auctions/${auctionId}/begin`, {
-                                userId: user.id
-                              });
-                            } catch (e) {
-                              console.error("Error beginning bidding:", e);
-                              alert("Error beginning bidding: " + (e.response?.data?.detail || e.message));
-                            }
-                          }}
-                          className="bg-green-600 text-white px-8 py-4 rounded-lg hover:bg-green-700 font-bold text-xl shadow-lg"
-                        >
-                          🚀 Begin Bidding
-                        </button>
-                      )}
-                      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-700">
-                        <div className="font-semibold mb-2">Participants in room:</div>
-                        <div className="space-y-1">
-                          {participants.map((p) => (
-                            <div key={p.userId} className="flex items-center justify-center gap-2">
-                              <span className="text-green-500">✓</span>
-                              <span>{p.userName}</span>
-                            </div>
-                          ))}
+                    // Waiting Room - Polished
+                    <div className="bg-gradient-to-br from-darts-bg-900 to-darts-bg-800 p-12 rounded-2xl border-2 border-darts-dark-700 shadow-2xl">
+                      <div className="text-center">
+                        {/* Animated icon */}
+                        <div className="text-8xl mb-6 animate-pulse-slow">🎯</div>
+                        
+                        <h2 className="text-5xl font-bold text-white mb-4 uppercase tracking-tight">
+                          Auction Lobby
+                        </h2>
+                        
+                        <p className="text-2xl text-gray-300 mb-8 font-medium">
+                          {isCommissioner 
+                            ? "Managers are gathering... Start when ready!" 
+                            : "Waiting for commissioner to begin the action"}
+                          <span className="animate-pulse">...</span>
+                        </p>
+
+                        {/* Participants Grid */}
+                        <div className="bg-darts-bg-800 rounded-xl p-6 mb-8 border border-darts-dark-700">
+                          <div className="text-darts-gold-500 font-bold text-lg uppercase tracking-wide mb-4">
+                            Managers Ready ({participants.length})
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            {participants.map((p) => (
+                              <div 
+                                key={p.userId} 
+                                className="flex items-center justify-center gap-2 bg-darts-dark-800 px-4 py-3 rounded-lg border border-darts-green-600"
+                              >
+                                <span className="text-darts-green-500 text-xl">✓</span>
+                                <span className="text-white font-semibold">{p.userName}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
+
+                        {/* Quick Facts */}
+                        <div className="grid grid-cols-3 gap-4 mb-8">
+                          <div className="bg-darts-dark-800 p-4 rounded-lg border border-darts-dark-700">
+                            <div className="text-3xl font-bold text-darts-gold-500">
+                              {players.length || 32}
+                            </div>
+                            <div className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                              Players
+                            </div>
+                          </div>
+                          <div className="bg-darts-dark-800 p-4 rounded-lg border border-darts-dark-700">
+                            <div className="text-3xl font-bold text-darts-green-500">
+                              £100k
+                            </div>
+                            <div className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                              Budget
+                            </div>
+                          </div>
+                          <div className="bg-darts-dark-800 p-4 rounded-lg border border-darts-dark-700">
+                            <div className="text-3xl font-bold text-darts-red-500">
+                              30s
+                            </div>
+                            <div className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                              Per Lot
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Begin Button (Commissioner only) */}
+                        {isCommissioner && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await axios.post(`${BACKEND_URL}/darts/auctions/${auctionId}/begin`, {
+                                  userId: user.id
+                                });
+                              } catch (e) {
+                                console.error("Error beginning bidding:", e);
+                                alert("Error beginning bidding: " + (e.response?.data?.detail || e.message));
+                              }
+                            }}
+                            className="bg-gradient-to-r from-darts-green-600 to-darts-green-700 text-white px-12 py-6 rounded-xl hover:from-darts-green-700 hover:to-darts-green-800 font-bold text-2xl shadow-2xl transform hover:scale-105 transition-all duration-200 uppercase tracking-wide border-2 border-darts-green-500 animate-glow"
+                          >
+                            🚀 BEGIN THE ACTION
+                          </button>
+                        )}
+                        
+                        {/* Participant waiting message */}
+                        {!isCommissioner && (
+                          <div className="text-gray-400 text-lg italic">
+                            The commissioner will start the auction shortly
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (

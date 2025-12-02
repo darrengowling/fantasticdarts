@@ -513,6 +513,14 @@ async def get_competition_auction(competition_id: str):
         raise HTTPException(status_code=404, detail="Auction not found")
     return DartsAuction(**auction)
 
+@api_router.get("/darts/auctions/{auction_id}")
+async def get_auction(auction_id: str):
+    """Get auction by ID"""
+    auction = await db.auctions.find_one({"id": auction_id})
+    if not auction:
+        raise HTTPException(status_code=404, detail="Auction not found")
+    return DartsAuction(**auction)
+
 @api_router.post("/darts/auctions/{auction_id}/start")
 async def start_auction(auction_id: str, commissioner_data: dict):
     """Start the auction (commissioner only)"""

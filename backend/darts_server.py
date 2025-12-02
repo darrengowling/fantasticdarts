@@ -1103,13 +1103,13 @@ async def join_auction(sid, data):
     if auction.get("currentPlayerId"):
         current_player = await db.players.find_one({"id": auction.get("currentPlayerId")})
     
-    # Get current bids for this lot
+    # Get current bids for this player
     current_bids = []
-    if auction.get("currentLotId"):
+    if auction.get("currentPlayerId"):
         cursor = db.bids.find({
             "auctionId": auction_id,
-            "lotId": auction.get("currentLotId")
-        }).sort("createdAt", -1).limit(10)
+            "playerId": auction.get("currentPlayerId")
+        }).sort("timestamp", -1).limit(10)
         current_bids = await cursor.to_list(length=10)
     
     # Get competition participants with updated budgets

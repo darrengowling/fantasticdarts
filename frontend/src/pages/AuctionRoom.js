@@ -5,7 +5,6 @@ import io from "socket.io-client";
 import { useAuctionClock } from "../hooks/useAuctionClock";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
 let socket = null;
 
@@ -14,13 +13,13 @@ export default function AuctionRoom() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [auction, setAuction] = useState(null);
-  const [clubs, setClubs] = useState([]);
-  const [currentClub, setCurrentClub] = useState(null);
+  const [players, setPlayers] = useState([]);
+  const [currentPlayer, setCurrentPlayer] = useState(null);
   const [bids, setBids] = useState([]);
   const [bidAmount, setBidAmount] = useState("");
   const [loading, setLoading] = useState(true);
-  const [selectedClubForLot, setSelectedClubForLot] = useState(null);
-  const [league, setLeague] = useState(null);
+  const [selectedPlayerForLot, setSelectedPlayerForLot] = useState(null);
+  const [competition, setCompetition] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [currentLotId, setCurrentLotId] = useState(null);
 
@@ -38,7 +37,7 @@ export default function AuctionRoom() {
     }
 
     loadAuction();
-    loadClubs();
+    loadPlayers();
     const cleanupSocket = initializeSocket();
 
     return () => {
@@ -60,7 +59,7 @@ export default function AuctionRoom() {
 
   const initializeSocket = () => {
     socket = io(BACKEND_URL, {
-      path: "/api/socket.io",
+      path: "/socket.io",
       transports: ["polling", "websocket"], // Try polling first
       reconnection: true,
       reconnectionDelay: 1000,
@@ -84,8 +83,8 @@ export default function AuctionRoom() {
     const handleSyncState = (data) => {
       console.log("Received sync state:", data);
       // Update state with current auction data (timer handled by useAuctionClock)
-      if (data.currentClub) {
-        setCurrentClub(data.currentClub);
+      if (data.currentPlayer) {
+        setCurrentPlayer(data.currentPlayer);
       }
       if (data.currentBids) {
         setBids(data.currentBids);
@@ -102,24 +101,24 @@ export default function AuctionRoom() {
     const handleBidPlaced = (data) => {
       console.log("Bid placed event received:", data);
       console.log("Current bids before update:", bids);
-      console.log("Current club:", currentClub);
+      console.log("Current club:", currentPlayer);
       setBids((prev) => {
         const newBids = [data.bid, ...prev];
         console.log("New bids after update:", newBids);
         return newBids;
       });
       loadAuction();
-      loadClubs(); // Reload clubs to update status
+      loadPlayers(); // Reload players to update status
     };
 
     const handleLotStarted = (data) => {
       console.log("Lot started:", data);
       
       if (data.isUnsoldRetry) {
-        alert(`🔄 Re-offering unsold club: ${data.club.name}!`);
+        alert(`🔄 Re-offering unsold player: ${data.player.name}!`);
       }
       
-      setCurrentClub(data.club);
+      setCurrentPlayer(data.player);
       if (data.timer && data.timer.lotId) {
         setCurrentLotId(data.timer.lotId);
       }
@@ -129,20 +128,20 @@ export default function AuctionRoom() {
       console.log("Lot sold:", data);
       
       if (data.unsold) {
-        alert(`❌ Club went unsold! "${data.clubId}" will be offered again later.`);
+        alert(`❌ Player went unsold! "${data.playerId}" will be offered again later.`);
       } else {
         const winnerName = data.winningBid ? data.winningBid.userName : "Unknown";
         const amount = data.winningBid ? `£${data.winningBid.amount.toLocaleString()}` : "";
-        alert(`✅ Club sold to ${winnerName} for ${amount}!`);
+        alert(`✅ Player sold to ${winnerName} for ${amount}!`);
       }
       
-      setCurrentClub(null);
+      setCurrentPlayer(null);
       setBidAmount("");
       if (data.participants) {
         setParticipants(data.participants);
       }
       loadAuction();
-      loadClubs(); // Reload clubs to update status
+      loadPlayers(); // Reload players to update status
     };
 
     const handleAntiSnipe = (data) => {
@@ -152,7 +151,7 @@ export default function AuctionRoom() {
 
     const handleAuctionComplete = (data) => {
       console.log("Auction complete:", data);
-      alert(data.message || "Auction complete! All clubs have been auctioned.");
+      alert(data.message || "Auction complete! All players have been auctioned.");
     };
 
     const handleAuctionPaused = (data) => {
@@ -218,13 +217,13 @@ export default function AuctionRoom() {
 
   const loadAuction = async () => {
     try {
-      const response = await axios.get(`${API}/auction/${auctionId}`);
+      const response = await axios.get(`${BACKEND_URL}/darts/auctions/${auctionId}`);
       console.log("Auction data loaded:", response.data);
       console.log("Bids from API:", response.data.bids);
       setAuction(response.data.auction);
       setBids(response.data.bids);
-      if (response.data.currentClub) {
-        setCurrentClub(response.data.currentClub);
+      if (response.data.currentPlayer) {
+        setCurrentPlayer(response.data.currentPlayer);
       }
       
       // Set lot ID for timer hook
@@ -232,12 +231,12 @@ export default function AuctionRoom() {
         setCurrentLotId(response.data.auction.currentLotId);
       }
 
-      // Load league
-      const leagueResponse = await axios.get(`${API}/leagues/${response.data.auction.leagueId}`);
-      setLeague(leagueResponse.data);
+      // Load competition
+      const competitionResponse = await axios.get(`${BACKEND_URL}/darts/competitions/${response.data.auction.competitionId}`);
+      setCompetition(competitionResponse.data);
 
       // Load participants
-      const participantsResponse = await axios.get(`${API}/leagues/${response.data.auction.leagueId}/participants`);
+      const participantsResponse = await axios.get(`${BACKEND_URL}/darts/competitions/${response.data.auction.competitionId}/participants`);
       setParticipants(participantsResponse.data);
     } catch (e) {
       console.error("Error loading auction:", e);
@@ -246,21 +245,21 @@ export default function AuctionRoom() {
     }
   };
 
-  const loadClubs = async () => {
+  const loadPlayers = async () => {
     try {
-      const response = await axios.get(`${API}/auction/${auctionId}/clubs`);
-      setClubs(response.data.clubs);
-      console.log("Loaded clubs:", response.data);
+      const response = await axios.get(`${BACKEND_URL}/darts/auctions/${auctionId}/players`);
+      setPlayers(response.data.players);
+      console.log("Loaded players:", response.data);
     } catch (error) {
-      console.error("Error loading clubs:", error);
+      console.error("Error loading players:", error);
     }
   };
 
   const loadParticipants = async () => {
     try {
       if (!auction) return;
-      const leagueId = auction.leagueId;
-      const response = await axios.get(`${API}/leagues/${leagueId}/participants`);
+      const competitionId = auction.competitionId;
+      const response = await axios.get(`${BACKEND_URL}/darts/competitions/${competitionId}/participants`);
       setParticipants(response.data);
     } catch (e) {
       console.error("Error loading participants:", e);
@@ -268,7 +267,7 @@ export default function AuctionRoom() {
   };
 
   const placeBid = async () => {
-    if (!user || !currentClub || !bidAmount) {
+    if (!user || !currentPlayer || !bidAmount) {
       alert("Please enter a bid amount");
       return;
     }
@@ -287,7 +286,7 @@ export default function AuctionRoom() {
     }
 
     // Check if higher than current highest bid
-    const currentBids = bids.filter((b) => b.clubId === currentClub.id);
+    const currentBids = bids.filter((b) => b.playerId === currentPlayer.id);
     if (currentBids.length > 0) {
       const highestBid = Math.max(...currentBids.map((b) => b.amount));
       if (amount <= highestBid) {
@@ -297,9 +296,9 @@ export default function AuctionRoom() {
     }
 
     try {
-      await axios.post(`${API}/auction/${auctionId}/bid`, {
+      await axios.post(`${BACKEND_URL}/darts/auctions/${auctionId}/bid`, {
         userId: user.id,
-        clubId: currentClub.id,
+        clubId: currentPlayer.id,
         amount,
       });
       setBidAmount("");
@@ -311,8 +310,8 @@ export default function AuctionRoom() {
 
   const startLot = async (clubId) => {
     try {
-      await axios.post(`${API}/auction/${auctionId}/start-lot/${clubId}`);
-      setSelectedClubForLot(null);
+      await axios.post(`${BACKEND_URL}/darts/auctions/${auctionId}/start-lot/${playerId}`);
+      setSelectedPlayerForLot(null);
     } catch (e) {
       console.error("Error starting lot:", e);
       alert("Error starting lot");
@@ -321,7 +320,7 @@ export default function AuctionRoom() {
 
   const completeLot = async () => {
     try {
-      await axios.post(`${API}/auction/${auctionId}/complete-lot`);
+      await axios.post(`${BACKEND_URL}/darts/auctions/${auctionId}/complete-lot`);
     } catch (e) {
       console.error("Error completing lot:", e);
     }
@@ -329,7 +328,7 @@ export default function AuctionRoom() {
 
   const pauseAuction = async () => {
     try {
-      const result = await axios.post(`${API}/auction/${auctionId}/pause`);
+      const result = await axios.post(`${BACKEND_URL}/darts/auctions/${auctionId}/pause`);
       console.log("Auction paused:", result.data);
     } catch (e) {
       console.error("Error pausing auction:", e);
@@ -339,7 +338,7 @@ export default function AuctionRoom() {
 
   const resumeAuction = async () => {
     try {
-      const result = await axios.post(`${API}/auction/${auctionId}/resume`);
+      const result = await axios.post(`${BACKEND_URL}/darts/auctions/${auctionId}/resume`);
       console.log("Auction resumed:", result.data);
     } catch (e) {
       console.error("Error resuming auction:", e);
@@ -352,14 +351,14 @@ export default function AuctionRoom() {
       `Are you sure you want to delete this auction? This will:\n` +
       `• Remove all auction data and bids\n` +
       `• Reset all participant budgets\n` +
-      `• Return the league to ready state\n\n` +
+      `• Return the competition to ready state\n\n` +
       `This action cannot be undone.`
     )) {
       return;
     }
 
     try {
-      const result = await axios.delete(`${API}/auction/${auctionId}`);
+      const result = await axios.delete(`${BACKEND_URL}/darts/auctions/${auctionId}`);
       console.log("Auction deleted:", result.data);
       alert("Auction deleted successfully!");
       navigate("/"); // Go back to homepage
@@ -377,14 +376,14 @@ export default function AuctionRoom() {
     );
   }
 
-  const isCommissioner = league && user && league.commissionerId === user.id;
-  const currentClubBids = currentClub ? bids.filter((b) => b.clubId === currentClub.id) : [];
+  const isCommissioner = competition && user && competition.commissionerId === user.id;
+  const currentClubBids = currentPlayer ? bids.filter((b) => b.playerId === currentPlayer.id) : [];
   
   // Debug logging for bid display
-  if (currentClub) {
-    console.log("Current club ID:", currentClub.id);
+  if (currentPlayer) {
+    console.log("Current player ID:", currentPlayer.id);
     console.log("All bids:", bids);
-    console.log("Current club bids:", currentClubBids);
+    console.log("Current player bids:", currentClubBids);
   }
   const highestBid = currentClubBids.length > 0 ? Math.max(...currentClubBids.map((b) => b.amount)) : 0;
 
@@ -404,7 +403,7 @@ export default function AuctionRoom() {
             <div className="flex justify-between items-center">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">
-                  {league ? league.name : "Auction Room"}
+                  {competition ? competition.name : "Auction Room"}
                 </h1>
                 <p className="text-gray-600">
                   Lot #{auction?.currentLot || 0} • Status: {auction?.status || "Unknown"}
@@ -482,7 +481,7 @@ export default function AuctionRoom() {
                       Spent: £{p.totalSpent.toLocaleString()}
                     </div>
                     <div className="text-xs text-gray-500">
-                      Clubs: {p.clubsWon.length}
+                      Players: {p.playersWon.length}
                     </div>
                   </div>
                 );
@@ -493,7 +492,7 @@ export default function AuctionRoom() {
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Current Lot */}
             <div className="lg:col-span-2 bg-white rounded-lg shadow-lg p-6">
-              {currentClub ? (
+              {currentPlayer ? (
                 <div>
                   <h2 className="text-2xl font-bold mb-4 text-gray-900">Current Lot</h2>
                   
@@ -512,11 +511,11 @@ export default function AuctionRoom() {
                     <div className="text-sm mt-2">Time Remaining</div>
                   </div>
 
-                  {/* Club Info */}
+                  {/* Player Info */}
                   <div className="bg-gray-50 p-6 rounded-lg mb-6">
-                    <h3 className="text-3xl font-bold text-gray-900 mb-2">{currentClub.name}</h3>
-                    <p className="text-xl text-gray-600">{currentClub.country}</p>
-                    <p className="text-sm text-gray-500 mt-2">UEFA ID: {currentClub.uefaId}</p>
+                    <h3 className="text-3xl font-bold text-gray-900 mb-2">{currentPlayer.name}</h3>
+                    <p className="text-xl text-gray-600">{currentPlayer.country}</p>
+                    <p className="text-sm text-gray-500 mt-2">UEFA ID: {currentPlayer.uefaId}</p>
                   </div>
 
                   {/* Current Highest Bid */}
@@ -558,7 +557,7 @@ export default function AuctionRoom() {
                     )}
                   </div>
 
-                  {/* Bid History for Current Club */}
+                  {/* Bid History for Current Player */}
                   <div className="mt-6">
                     <h4 className="font-semibold text-gray-900 mb-3">Bid History</h4>
                     <div className="max-h-64 overflow-y-auto">
@@ -583,19 +582,19 @@ export default function AuctionRoom() {
                   </div>
 
                   <div className="mt-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-gray-700">
-                    ⏱️ Lot will auto-complete when timer expires. Next club will load automatically.
+                    ⏱️ Lot will auto-complete when timer expires. Next player will load automatically.
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">⏳</div>
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                    {auction?.status === "completed" ? "Auction Complete!" : "Loading Next Club..."}
+                    {auction?.status === "completed" ? "Auction Complete!" : "Loading Next Player..."}
                   </h2>
                   <p className="text-gray-600">
                     {auction?.status === "completed" 
-                      ? "All clubs have been auctioned. Check the standings!" 
-                      : "Clubs auto-load in random order. Next club starting soon..."}
+                      ? "All players have been auctioned. Check the standings!" 
+                      : "Players auto-load in random order. Next player starting soon..."}
                   </p>
                 </div>
               )}
@@ -609,25 +608,25 @@ export default function AuctionRoom() {
               <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
                 <div className="bg-blue-50 p-2 rounded">
                   <div className="font-semibold text-blue-800">Total</div>
-                  <div className="text-blue-600">{clubs.length}</div>
+                  <div className="text-blue-600">{players.length}</div>
                 </div>
                 <div className="bg-green-50 p-2 rounded">
                   <div className="font-semibold text-green-800">Sold</div>
-                  <div className="text-green-600">{clubs.filter(c => c.status === 'sold').length}</div>
+                  <div className="text-green-600">{players.filter(p => p.status === 'sold').length}</div>
                 </div>
                 <div className="bg-yellow-50 p-2 rounded">
                   <div className="font-semibold text-yellow-800">Current</div>
-                  <div className="text-yellow-600">{clubs.filter(c => c.status === 'current').length}</div>
+                  <div className="text-yellow-600">{players.filter(p => p.status === 'current').length}</div>
                 </div>
                 <div className="bg-gray-50 p-2 rounded">
                   <div className="font-semibold text-gray-800">Remaining</div>
-                  <div className="text-gray-600">{clubs.filter(c => c.status === 'upcoming').length}</div>
+                  <div className="text-gray-600">{players.filter(p => p.status === 'upcoming').length}</div>
                 </div>
               </div>
 
-              {/* Club List */}
+              {/* Player List */}
               <div className="max-h-[500px] overflow-y-auto space-y-1">
-                {clubs.map((club) => {
+                {players.map((player) => {
                   const statusColors = {
                     current: "bg-yellow-100 border-yellow-300 text-yellow-800",
                     upcoming: "bg-blue-50 border-blue-200 text-blue-800",
@@ -644,30 +643,30 @@ export default function AuctionRoom() {
                   
                   return (
                     <div
-                      key={club.id}
-                      className={`p-2 rounded-lg border text-xs ${statusColors[club.status] || 'bg-gray-50 border-gray-200'}`}
+                      key={player.id}
+                      className={`p-2 rounded-lg border text-xs ${statusColors[player.status] || 'bg-gray-50 border-gray-200'}`}
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1 min-w-0">
-                          <div className="font-semibold truncate">{club.name}</div>
-                          <div className="text-xs opacity-75">{club.country}</div>
+                          <div className="font-semibold truncate">{player.name}</div>
+                          <div className="text-xs opacity-75">{player.country}</div>
                         </div>
                         <div className="ml-2 flex flex-col items-end">
                           <div className="flex items-center gap-1">
-                            <span>{statusIcons[club.status]}</span>
+                            <span>{statusIcons[player.status]}</span>
                             {/* Hide lot number to keep draw order secret */}
                           </div>
-                          {club.status === 'sold' && club.winningBid && (
+                          {player.status === 'sold' && player.winningBid && (
                             <div className="text-xs font-semibold">
-                              £{club.winningBid.toLocaleString()}
+                              £{player.winningBid.toLocaleString()}
                             </div>
                           )}
                         </div>
                       </div>
                       
-                      {club.status === 'sold' && club.winner && (
+                      {player.status === 'sold' && player.winner && (
                         <div className="text-xs mt-1 opacity-75">
-                          Won by {club.winner}
+                          Won by {player.winner}
                         </div>
                       )}
                     </div>

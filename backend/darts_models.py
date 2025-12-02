@@ -38,6 +38,7 @@ class DartsCompetition(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     commissionerId: str
+    commissionerName: Optional[str] = None
     tournamentType: str = "pdc_world_championship"  # Default to World Championship
     budget: float = 100000.0  # Virtual currency budget
     squadSize: int = 8  # Configurable based on participant count

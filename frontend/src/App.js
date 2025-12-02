@@ -3,6 +3,7 @@ import "./App.css";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import axios from "axios";
 import CreateCompetition from "./pages/CreateCompetition";
+import CompetitionDetail from "./pages/CompetitionDetail";
 import PlayersList from "./pages/PlayersList";
 import AuctionRoom from "./pages/AuctionRoom";
 
@@ -14,19 +15,29 @@ const Home = () => {
   const [showUserDialog, setShowUserDialog] = useState(false);
   const [userForm, setUserForm] = useState({ name: "", email: "" });
   const [competitions, setCompetitions] = useState([]);
+  const [inviteToken, setInviteToken] = useState("");
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      const userData = JSON.parse(savedUser);
+      setUser(userData);
+      loadCompetitions(userData.id);
     }
-    loadCompetitions();
   }, []);
 
-  const loadCompetitions = async () => {
+  const loadCompetitions = async (userId) => {
     try {
       const response = await axios.get(`${BACKEND_URL}/darts/competitions`);
-      setCompetitions(response.data);
+      // Filter to show only competitions where user is a participant
+      if (userId) {
+        const myCompetitions = response.data.filter(comp => 
+          comp.participants.some(p => p.userId === userId)
+        );
+        setCompetitions(myCompetitions);
+      } else {
+        setCompetitions(response.data);
+      }
     } catch (e) {
       console.error("Error loading competitions:", e);
     }
@@ -53,6 +64,44 @@ const Home = () => {
   const handleSignOut = () => {
     setUser(null);
     localStorage.removeItem("user");
+  };
+
+  const handleJoinWithToken = async () => {
+    if (!user) {
+      alert("Please sign in first");
+      return;
+    }
+
+    if (!inviteToken) {
+      alert("Please enter an invite token");
+      return;
+    }
+
+    try {
+      // First, find the competition by invite token (case-insensitive)
+      const response = await axios.get(`${BACKEND_URL}/darts/competitions`);
+      const competition = response.data.find(
+        (c) => c.inviteToken.toLowerCase() === inviteToken.toLowerCase()
+      );
+
+      if (!competition) {
+        alert("Invalid invite token");
+        return;
+      }
+
+      // Join the competition
+      await axios.post(`${BACKEND_URL}/darts/competitions/${competition.id}/join`, {
+        userId: user.id,
+        inviteToken: inviteToken
+      });
+
+      alert("Joined competition successfully!");
+      loadCompetitions(user.id); // Reload competitions list
+      navigate(`/competition/${competition.id}`);
+    } catch (e) {
+      console.error("Error joining competition:", e);
+      alert(e.response?.data?.detail || "Error joining competition");
+    }
   };
 
   return (
@@ -166,10 +215,37 @@ const Home = () => {
             </div>
           </div>
 
+          {/* Join Competition */}
+          {user && (
+            <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                🎫 Join Competition
+              </h2>
+              <p className="text-gray-600 mb-4">Have an invite token? Enter it below to join:</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter 8-character token"
+                  value={inviteToken}
+                  onChange={(e) => setInviteToken(e.target.value)}
+                  className="flex-1 px-4 py-3 border rounded-lg font-mono text-lg"
+                  maxLength={8}
+                />
+                <button
+                  onClick={handleJoinWithToken}
+                  disabled={!inviteToken}
+                  className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  Join
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Competitions List */}
           <div className="bg-white rounded-lg shadow-lg p-8">
             <h2 className="text-2xl font-bold mb-4 text-gray-900">
-              Active Competitions
+              My Competitions
             </h2>
             
             {competitions.length === 0 ? (
@@ -189,14 +265,7 @@ const Home = () => {
                   <div
                     key={competition.id}
                     className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => {
-                      // Check if auction exists
-                      if (competition.auctionId) {
-                        navigate(`/auction/${competition.auctionId}`);
-                      } else {
-                        alert("No auction created for this competition yet");
-                      }
-                    }}
+                    onClick={() => navigate(`/competition/${competition.id}`)}
                   >
                     <h3 className="text-lg font-bold text-gray-900 mb-2">
                       {competition.name}
@@ -224,6 +293,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/create-competition" element={<CreateCompetition />} />
+        <Route path="/competition/:id" element={<CompetitionDetail />} />
         <Route path="/players" element={<PlayersList />} />
         <Route path="/auction/:auctionId" element={<AuctionRoom />} />
       </Routes>

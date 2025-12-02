@@ -183,27 +183,55 @@ async def create_player(input: DartsPlayerCreate):
 @api_router.post("/darts/competitions", response_model=DartsCompetition)
 async def create_competition(input: DartsCompetitionCreate):
     """Create a new darts competition"""
-    # Verify commissioner exists
-    commissioner = await db.users.find_one({"id": input.commissionerId})
-    if not commissioner:
-        raise HTTPException(status_code=404, detail="Commissioner not found")
-    
-    # Verify selected players exist
-    if input.selectedPlayers:
-        player_count = await db.players.count_documents({
-            "id": {"$in": input.selectedPlayers}
-        })
-        if player_count != len(input.selectedPlayers):
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Some selected players not found. Expected {len(input.selectedPlayers)}, found {player_count}"
-            )
-    
-    competition_obj = DartsCompetition(**input.model_dump())
-    await db.competitions.insert_one(competition_obj.model_dump())
-    logger.info(f"Created competition: {competition_obj.name} by {commissioner['name']}")
-    
-    return competition_obj
+    try:
+        # Verify commissioner exists
+        commissioner = await db.users.find_one({"id": input.commissionerId})
+        if not commissioner:
+            raise HTTPException(status_code=404, detail="Commissioner not found")
+        
+        # Verify selected players exist
+        if input.selectedPlayers:
+            player_count = await db.players.count_documents({
+                "id": {"$in": input.selectedPlayers}
+            })
+            if player_count != len(input.selectedPlayers):
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Some selected players not found. Expected {len(input.selectedPlayers)}, found {player_count}"
+                )
+        
+        competition_obj = DartsCompetition(**input.model_dump())
+        competition_obj.commissionerName = commissioner["name"]
+        
+        # Add commissioner as first participant
+        competition_obj.participants = [{
+            "userId": commissioner["id"],
+            "userName": commissioner["name"],
+            "userEmail": commissioner["email"],
+            "budgetRemaining": competition_obj.budget,
+            "playersWon": [],
+            "totalSpent": 0.0
+        }]
+        
+        await db.competitions.insert_one(competition_obj.model_dump())
+        
+        # Create commissioner's user squad
+        squad = UserSquad(
+            competitionId=competition_obj.id,
+            userId=commissioner["id"],
+            userName=commissioner["name"],
+            budgetRemaining=competition_obj.budget
+        )
+        await db.user_squads.insert_one(squad.model_dump())
+        
+        logger.info(f"Created competition: {competition_obj.name} by {commissioner['name']}")
+        
+        return competition_obj
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating competition: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/darts/competitions", response_model=List[DartsCompetition])
 async def list_competitions(
@@ -239,58 +267,68 @@ async def get_competition(competition_id: str):
 @api_router.post("/darts/competitions/{competition_id}/join")
 async def join_competition(competition_id: str, user_data: dict):
     """Join a competition with invite token"""
-    user_id = user_data.get("userId")
-    invite_token = user_data.get("inviteToken")
-    
-    if not user_id or not invite_token:
-        raise HTTPException(status_code=400, detail="userId and inviteToken required")
-    
-    # Verify user exists
-    user = await db.users.find_one({"id": user_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Get competition
-    competition = await db.competitions.find_one({"id": competition_id})
-    if not competition:
-        raise HTTPException(status_code=404, detail="Competition not found")
-    
-    # Verify invite token
-    if competition["inviteToken"] != invite_token:
-        raise HTTPException(status_code=403, detail="Invalid invite token")
-    
-    # Check if already joined
-    participants = competition.get("participants", [])
-    if any(p["userId"] == user_id for p in participants):
-        raise HTTPException(status_code=400, detail="Already joined this competition")
-    
-    # Add participant
-    participant = {
-        "userId": user_id,
-        "userName": user["name"],
-        "userEmail": user["email"],
-        "budgetRemaining": competition["budget"],
-        "playersWon": [],
-        "totalSpent": 0.0
-    }
-    
-    await db.competitions.update_one(
-        {"id": competition_id},
-        {"$push": {"participants": participant}}
-    )
-    
-    # Create user squad
-    squad = UserSquad(
-        competitionId=competition_id,
-        userId=user_id,
-        userName=user["name"],
-        budgetRemaining=competition["budget"]
-    )
-    await db.user_squads.insert_one(squad.model_dump())
-    
-    logger.info(f"User {user['name']} joined competition {competition['name']}")
-    
-    return {"success": True, "message": "Joined competition"}
+    try:
+        user_id = user_data.get("userId")
+        invite_token = user_data.get("inviteToken")
+        
+        if not user_id or not invite_token:
+            raise HTTPException(status_code=400, detail="userId and inviteToken required")
+        
+        # Verify user exists
+        user = await db.users.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Get competition
+        competition = await db.competitions.find_one({"id": competition_id})
+        if not competition:
+            raise HTTPException(status_code=404, detail="Competition not found")
+        
+        # Verify invite token (case-insensitive)
+        if competition["inviteToken"].upper() != invite_token.upper():
+            raise HTTPException(status_code=403, detail="Invalid invite token")
+        
+        # Check if already joined
+        participants = competition.get("participants", [])
+        logger.info(f"Join attempt - User: {user['name']} ({user_id}), Competition: {competition['name']}")
+        logger.info(f"Current participants: {[p['userName'] for p in participants]}")
+        
+        if any(p["userId"] == user_id for p in participants):
+            logger.warning(f"User {user['name']} already in competition")
+            raise HTTPException(status_code=400, detail="Already joined this competition")
+        
+        # Add participant
+        participant = {
+            "userId": user_id,
+            "userName": user["name"],
+            "userEmail": user["email"],
+            "budgetRemaining": competition["budget"],
+            "playersWon": [],
+            "totalSpent": 0.0
+        }
+        
+        await db.competitions.update_one(
+            {"id": competition_id},
+            {"$push": {"participants": participant}}
+        )
+        
+        # Create user squad
+        squad = UserSquad(
+            competitionId=competition_id,
+            userId=user_id,
+            userName=user["name"],
+            budgetRemaining=competition["budget"]
+        )
+        await db.user_squads.insert_one(squad.model_dump())
+        
+        logger.info(f"User {user['name']} joined competition {competition['name']}")
+        
+        return {"success": True, "message": "Joined competition"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error joining competition: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.delete("/darts/competitions/{competition_id}")
 async def delete_competition(competition_id: str, user_data: dict):

@@ -12,7 +12,8 @@ export default function CreateCompetition() {
   const [form, setForm] = useState({
     name: "",
     budget: 100000, // £100k default budget
-    squadSize: 8, // 8 players per participant
+    squadSize: 2, // Players per participant
+    numParticipants: 2, // Expected number of participants
   });
 
   useEffect(() => {
@@ -50,8 +51,9 @@ export default function CreateCompetition() {
       return;
     }
 
-    if (selectedPlayers.length !== 32) {
-      alert("Please select exactly 32 players (top 32 seeds)");
+    const playersNeeded = form.numParticipants * form.squadSize;
+    if (selectedPlayers.length !== playersNeeded) {
+      alert(`Please select exactly ${playersNeeded} players (${form.numParticipants} participants × ${form.squadSize} squad size)`);
       return;
     }
 
@@ -69,12 +71,13 @@ export default function CreateCompetition() {
     }
   };
 
-  const selectTop32 = () => {
-    const top32 = players
+  const selectTopPlayers = () => {
+    const playersNeeded = form.numParticipants * form.squadSize;
+    const topPlayers = players
       .sort((a, b) => a.seed - b.seed)
-      .slice(0, 32)
+      .slice(0, playersNeeded)
       .map((p) => p.id);
-    setSelectedPlayers(top32);
+    setSelectedPlayers(topPlayers);
   };
 
   return (
@@ -104,21 +107,22 @@ export default function CreateCompetition() {
               />
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-gray-700 mb-2 font-semibold">
-                  Budget per Participant (£)
+                  Number of Participants
                 </label>
                 <input
                   type="number"
                   className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  value={form.budget}
-                  onChange={(e) => setForm({ ...form, budget: Number(e.target.value) })}
-                  min="50000"
+                  value={form.numParticipants}
+                  onChange={(e) => setForm({ ...form, numParticipants: Number(e.target.value) })}
+                  min="2"
+                  max="8"
                   required
-                  data-testid="competition-budget-input"
+                  data-testid="competition-num-participants-input"
                 />
-                <p className="text-sm text-gray-500 mt-1">Recommended: £100,000</p>
+                <p className="text-sm text-gray-500 mt-1">How many people will play</p>
               </div>
 
               <div>
@@ -135,25 +139,44 @@ export default function CreateCompetition() {
                   required
                   data-testid="competition-squad-size-input"
                 />
-                <p className="text-sm text-gray-500 mt-1">Players each participant can own</p>
+                <p className="text-sm text-gray-500 mt-1">Players per participant</p>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 mb-2 font-semibold">
+                  Budget per Participant (£)
+                </label>
+                <input
+                  type="number"
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  value={form.budget}
+                  onChange={(e) => setForm({ ...form, budget: Number(e.target.value) })}
+                  min="10000"
+                  required
+                  data-testid="competition-budget-input"
+                />
+                <p className="text-sm text-gray-500 mt-1">Default: £100,000</p>
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-gray-700 font-semibold">
-                  Select 32 Players for Competition
+                  Select Players for Competition
                 </label>
                 <button
                   type="button"
-                  onClick={selectTop32}
+                  onClick={selectTopPlayers}
                   className="text-green-600 hover:text-green-700 font-semibold text-sm"
                 >
-                  Quick Select: Top 32 Seeds
+                  Quick Select: Top {form.numParticipants * form.squadSize} Seeds
                 </button>
               </div>
               <div className="text-sm text-gray-600 mb-3">
-                Selected: {selectedPlayers.length} / 32
+                Selected: {selectedPlayers.length} / {form.numParticipants * form.squadSize}
+                <span className="ml-2 text-gray-500">
+                  ({form.numParticipants} participants × {form.squadSize} squad size)
+                </span>
               </div>
 
               <div className="border rounded-lg p-4 max-h-96 overflow-y-auto bg-gray-50">
@@ -190,12 +213,12 @@ export default function CreateCompetition() {
             <button
               type="submit"
               className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
-              disabled={selectedPlayers.length !== 32}
+              disabled={selectedPlayers.length !== form.numParticipants * form.squadSize}
               data-testid="create-competition-submit"
             >
-              {selectedPlayers.length === 32
+              {selectedPlayers.length === form.numParticipants * form.squadSize
                 ? "Create Competition"
-                : `Select ${32 - selectedPlayers.length} more players`}
+                : `Select ${(form.numParticipants * form.squadSize) - selectedPlayers.length} more players`}
             </button>
           </form>
         </div>

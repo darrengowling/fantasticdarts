@@ -1,0 +1,32 @@
+[
+  {
+    "id": "1",
+    "content": "Install frontend dependencies and create .env file",
+    "status": "completed"
+  },
+  {
+    "id": "2",
+    "content": "Adapt ClubsList.js → PlayersList.js (rename and update terminology)",
+    "status": "completed"
+  },
+  {
+    "id": "3",
+    "content": "Adapt CreateLeague.js → CreateCompetition.js (rename and update terminology)",
+    "status": "completed"
+  },
+  {
+    "id": "4",
+    "content": "Update AuctionRoom.js terminology (league→competition, club→player)",
+    "status": "completed"
+  },
+  {
+    "id": "5",
+    "content": "Update App.js routing and terminology",
+    "status": "completed"
+  },
+  {
+    "id": "6",
+    "content": "Test frontend with backend - verify auction flow works end-to-end",
+    "status": "completed"
+  }
+]

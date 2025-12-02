@@ -668,10 +668,13 @@ async def resume_auction(auction_id: str, commissioner_data: dict):
 @api_router.post("/darts/auctions/{auction_id}/bid")
 async def place_bid(auction_id: str, bid_input: DartsBidCreate):
     """Place a bid on the current player"""
-    # Get auction
-    auction = await db.auctions.find_one({"id": auction_id})
-    if not auction:
-        raise HTTPException(status_code=404, detail="Auction not found")
+    try:
+        logger.info(f"Bid attempt: user={bid_input.userId}, player={bid_input.playerId}, amount={bid_input.amount}")
+        
+        # Get auction
+        auction = await db.auctions.find_one({"id": auction_id})
+        if not auction:
+            raise HTTPException(status_code=404, detail="Auction not found")
     
     if auction["status"] != "active":
         raise HTTPException(status_code=400, detail="Auction is not active")
@@ -753,6 +756,12 @@ async def place_bid(auction_id: str, bid_input: DartsBidCreate):
     }, room=f"auction_{auction_id}")
     
     return bid_obj
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error placing bid: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to place bid: {str(e)}")
 
 # Helper functions for auction flow
 

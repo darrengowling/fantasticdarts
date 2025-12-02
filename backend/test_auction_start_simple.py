@@ -6,11 +6,19 @@ import requests
 BASE_URL = "http://localhost:8001/api"
 
 # Use existing data from previous test
-# Get the last competition
+# Get competitions and find one with an auction
 response = requests.get(f"{BASE_URL}/darts/competitions")
 competitions = response.json()
-if competitions:
-    comp = competitions[-1]
+
+comp = None
+for c in reversed(competitions):
+    # Check if this competition has an auction
+    response = requests.get(f"{BASE_URL}/darts/competitions/{c['id']}/auction")
+    if response.status_code == 200:
+        comp = c
+        break
+
+if comp:
     print(f"Using competition: {comp['name']} ({comp['id']})")
     
     # Get the auction

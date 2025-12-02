@@ -286,7 +286,7 @@ async def join_competition(competition_id: str, user_data: dict):
         userName=user["name"],
         budgetRemaining=competition["budget"]
     )
-    await db.user_squads.insert_one(squad.dict())
+    await db.user_squads.insert_one(squad.model_dump())
     
     logger.info(f"User {user['name']} joined competition {competition['name']}")
     
@@ -345,7 +345,7 @@ async def create_match(competition_id: str, input: DartsMatchCreate):
         player2Name=player2["name"]
     )
     
-    await db.matches.insert_one(match_obj.dict())
+    await db.matches.insert_one(match_obj.model_dump())
     logger.info(f"Created match: {player1['name']} vs {player2['name']}")
     
     return match_obj
@@ -404,8 +404,8 @@ async def enter_match_result(
         {"$set": {
             "winnerId": result.winnerId,
             "score": result.score,
-            "player1Stats": result.player1Stats.dict(),
-            "player2Stats": result.player2Stats.dict(),
+            "player1Stats": result.player1Stats.model_dump(),
+            "player2Stats": result.player2Stats.model_dump(),
             "completed": True,
             "enteredBy": user_id,
             "enteredAt": datetime.now(timezone.utc)
@@ -437,7 +437,7 @@ async def enter_match_result(
     await sio.emit('match_completed', {
         "competitionId": competition_id,
         "matchId": match_id,
-        "match": match_obj.dict()
+        "match": match_obj.model_dump()
     }, room=f"competition_{competition_id}")
     
     return {"success": True, "match": match_obj}
@@ -500,7 +500,7 @@ async def create_auction(competition_id: str, input: DartsAuctionCreate):
         playerQueue=selected_players.copy()
     )
     
-    await db.auctions.insert_one(auction_obj.dict())
+    await db.auctions.insert_one(auction_obj.model_dump())
     logger.info(f"Created auction for competition {competition_id}")
     
     return auction_obj
@@ -516,41 +516,53 @@ async def get_competition_auction(competition_id: str):
 @api_router.post("/darts/auctions/{auction_id}/start")
 async def start_auction(auction_id: str, commissioner_data: dict):
     """Start the auction (commissioner only)"""
-    user_id = commissioner_data.get("userId")
+    try:
+        user_id = commissioner_data.get("userId")
+        logger.info(f"Starting auction {auction_id} by user {user_id}")
+        
+        # Get auction
+        auction = await db.auctions.find_one({"id": auction_id})
+        if not auction:
+            raise HTTPException(status_code=404, detail="Auction not found")
+        
+        logger.info(f"Auction found, status: {auction['status']}")
+        
+        # Verify commissioner
+        competition = await db.competitions.find_one({"id": auction["competitionId"]})
+        if not competition or competition["commissionerId"] != user_id:
+            raise HTTPException(status_code=403, detail="Only commissioner can start auction")
+        
+        if auction["status"] != "pending":
+            raise HTTPException(status_code=400, detail="Auction already started")
+        
+        # Update auction status
+        logger.info("Updating auction status to active")
+        await db.auctions.update_one(
+            {"id": auction_id},
+            {"$set": {"status": "active"}}
+        )
+        
+        # Start first lot
+        if auction["playerQueue"]:
+            first_player_id = auction["playerQueue"][0]
+            logger.info(f"Starting first lot for player {first_player_id}")
+            await start_lot(auction_id, first_player_id)
+        
+        logger.info(f"Started auction {auction_id}")
+        
+        # Emit to all participants
+        await sio.emit('auction_started', {
+            "auctionId": auction_id,
+            "competitionId": auction["competitionId"]
+        }, room=f"auction_{auction_id}")
+        
+        return {"success": True, "message": "Auction started"}
     
-    # Get auction
-    auction = await db.auctions.find_one({"id": auction_id})
-    if not auction:
-        raise HTTPException(status_code=404, detail="Auction not found")
-    
-    # Verify commissioner
-    competition = await db.competitions.find_one({"id": auction["competitionId"]})
-    if not competition or competition["commissionerId"] != user_id:
-        raise HTTPException(status_code=403, detail="Only commissioner can start auction")
-    
-    if auction["status"] != "pending":
-        raise HTTPException(status_code=400, detail="Auction already started")
-    
-    # Update auction status
-    await db.auctions.update_one(
-        {"id": auction_id},
-        {"$set": {"status": "active"}}
-    )
-    
-    # Start first lot
-    if auction["playerQueue"]:
-        first_player_id = auction["playerQueue"][0]
-        await start_lot(auction_id, first_player_id)
-    
-    logger.info(f"Started auction {auction_id}")
-    
-    # Emit to all participants
-    await sio.emit('auction_started', {
-        "auctionId": auction_id,
-        "competitionId": auction["competitionId"]
-    }, room=f"auction_{auction_id}")
-    
-    return {"success": True, "message": "Auction started"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting auction {auction_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to start auction: {str(e)}")
 
 @api_router.post("/darts/auctions/{auction_id}/pause")
 async def pause_auction(auction_id: str, commissioner_data: dict):
@@ -700,7 +712,7 @@ async def place_bid(auction_id: str, bid_input: DartsBidCreate):
         userEmail=user["email"] if user else None
     )
     
-    await db.bids.insert_one(bid_obj.dict())
+    await db.bids.insert_one(bid_obj.model_dump())
     
     logger.info(f"Bid placed: {bid_input.amount} by {user['name'] if user else bid_input.userId}")
     
@@ -738,45 +750,60 @@ async def place_bid(auction_id: str, bid_input: DartsBidCreate):
 
 async def start_lot(auction_id: str, player_id: str):
     """Start a new lot (player) in the auction"""
-    auction = await db.auctions.find_one({"id": auction_id})
-    if not auction:
-        return
-    
-    # Get player details
-    player = await db.players.find_one({"id": player_id})
-    if not player:
-        logger.error(f"Player {player_id} not found")
-        return
-    
-    # Create lot ID
-    lot_id = str(uuid.uuid4())
-    
-    # Calculate end time
-    end_time = datetime.now(timezone.utc) + timedelta(seconds=auction["bidTimer"])
-    
-    # Update auction
-    await db.auctions.update_one(
-        {"id": auction_id},
-        {"$set": {
-            "currentPlayerId": player_id,
-            "currentLotId": lot_id,
-            "currentLot": auction["currentLot"] + 1,
-            "timerEndsAt": end_time
-        }}
-    )
-    
-    # Start countdown timer
-    asyncio.create_task(countdown_timer(auction_id, end_time, lot_id))
-    
-    logger.info(f"Started lot for player {player['name']}")
-    
-    # Emit to all participants
-    await sio.emit('lot_started', {
-        "auctionId": auction_id,
-        "lotId": lot_id,
-        "player": sanitize_mongo_doc(player),
-        "endsAt": int(end_time.timestamp() * 1000)
-    }, room=f"auction_{auction_id}")
+    try:
+        logger.info(f"start_lot called for auction {auction_id}, player {player_id}")
+        
+        auction = await db.auctions.find_one({"id": auction_id})
+        if not auction:
+            logger.error(f"Auction {auction_id} not found in start_lot")
+            return
+        
+        # Get player details
+        player = await db.players.find_one({"id": player_id})
+        if not player:
+            logger.error(f"Player {player_id} not found")
+            return
+        
+        logger.info(f"Found player: {player.get('name')}")
+        
+        # Create lot ID
+        lot_id = str(uuid.uuid4())
+        
+        # Calculate end time
+        end_time = datetime.now(timezone.utc) + timedelta(seconds=auction["bidTimer"])
+        logger.info(f"End time calculated: {end_time}")
+        
+        # Update auction
+        logger.info("Updating auction with lot details")
+        await db.auctions.update_one(
+            {"id": auction_id},
+            {"$set": {
+                "currentPlayerId": player_id,
+                "currentLotId": lot_id,
+                "currentLot": auction["currentLot"] + 1,
+                "timerEndsAt": end_time
+            }}
+        )
+        
+        # Start countdown timer
+        logger.info("Creating countdown timer task")
+        asyncio.create_task(countdown_timer(auction_id, end_time, lot_id))
+        
+        logger.info(f"Started lot for player {player['name']}")
+        
+        # Emit to all participants
+        logger.info("Emitting lot_started event")
+        await sio.emit('lot_started', {
+            "auctionId": auction_id,
+            "lotId": lot_id,
+            "player": sanitize_mongo_doc(player),
+            "endsAt": int(end_time.timestamp() * 1000)
+        }, room=f"auction_{auction_id}")
+        
+        logger.info("start_lot completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Error in start_lot for auction {auction_id}: {e}", exc_info=True)
 
 async def complete_lot(auction_id: str):
     """Complete the current lot and award player to highest bidder"""
@@ -930,7 +957,7 @@ async def get_user_piggybacks(competition_id: str, user_id: str):
     piggyback_service = PiggybackService(db)
     piggybacks = await piggyback_service.get_user_piggyback_history(competition_id, user_id)
     
-    return {"piggybacks": [p.dict() for p in piggybacks]}
+    return {"piggybacks": [p.model_dump() for p in piggybacks]}
 
 @api_router.get("/darts/competitions/{competition_id}/users/{user_id}/wildcard-eligible")
 async def check_wildcard_eligibility(competition_id: str, user_id: str):

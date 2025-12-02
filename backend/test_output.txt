@@ -1,0 +1,48 @@
+======================================================================
+­ƒÄ» DARTS FANTASY AUCTION - SOCKET.IO END-TO-END TEST
+======================================================================
+
+­ƒôï Setting up test data...
+  Creating commissioner...
+  Ô£à Commissioner: Test Commissioner
+  Creating participants...
+  Ô£à Participant 1: Participant 1
+  Ô£à Participant 2: Participant 2
+  Ô£à Participant 3: Participant 3
+  Fetching players...
+  Ô£à Selected 16 players
+  Creating competition...
+  Ô£à Competition: Test Auction Competition
+  ­ƒôØ Invite token: 7361b86a
+  Joining participants...
+  Ô£à Participant 1 joined
+  Ô£à Participant 2 joined
+  Ô£à Participant 3 joined
+  Creating auction...
+  Ô£à Auction created: ad69aae9-8ceb-4b4c-a0b6-cb9989ddf6f7
+  ­ƒôè Players in queue: 16
+
+­ƒöî Connecting Socket.IO clients...
+  Connecting commissioner...
+  [Commissioner] ­ƒöî Connected
+  Ô£à Commissioner connected and joined auction room
+  Connecting Participant 1...
+  [Participant 1] ­ƒöî Connected
+  Ô£à Participant 1 connected and joined auction room
+  Connecting Participant 2...
+  [Participant 2] ­ƒöî Connected
+  Ô£à Participant 2 connected and joined auction room
+  Connecting Participant 3...
+  [Participant 3] ­ƒöî Connected
+  Ô£à Participant 3 connected and joined auction room
+
+­ƒÜÇ Starting auction...
+  ÔØî Failed to start: Internal Server Error
+ÔØî Failed to start auction
+
+­ƒöî Disconnecting clients...
+  [Commissioner] ­ƒöî Disconnected
+  [Participant 1] ­ƒöî Disconnected
+  [Participant 2] ­ƒöî Disconnected
+  [Participant 3] ­ƒöî Disconnected
+  Ô£à All clients disconnected

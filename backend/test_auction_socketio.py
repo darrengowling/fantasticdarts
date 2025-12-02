@@ -194,15 +194,19 @@ class AuctionTester:
     def start_auction(self):
         """Start the auction"""
         print("\n🚀 Starting auction...")
+        print(f"  Auction ID: {self.auction['id']}")
+        print(f"  Commissioner ID: {self.commissioner['id']}")
         response = requests.post(
             f"{BASE_URL}/darts/auctions/{self.auction['id']}/start",
             json={"userId": self.commissioner['id']}
         )
+        print(f"  Response status code: {response.status_code}")
+        print(f"  Response body: {response.text}")
         if response.status_code == 200:
             print("  ✅ Auction started!")
             return True
         else:
-            print(f"  ❌ Failed to start: {response.text}")
+            print(f"  ❌ Failed to start")
             return False
             
     def simulate_bidding(self):

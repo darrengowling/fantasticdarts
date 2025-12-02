@@ -771,6 +771,8 @@ async def place_bid(auction_id: str, bid_input: DartsBidCreate):
             timer_ends_at = timer_ends_at.replace(tzinfo=timezone.utc)
         
         time_remaining = (timer_ends_at - datetime.now(timezone.utc)).total_seconds()
+        lot_id = auction.get("currentLotId")
+        
         if time_remaining < auction["antiSnipeSeconds"]:
             new_end_time = datetime.now(timezone.utc) + timedelta(seconds=auction["antiSnipeSeconds"])
             
@@ -783,10 +785,12 @@ async def place_bid(auction_id: str, bid_input: DartsBidCreate):
             if auction_id in active_timers:
                 active_timers[auction_id].cancel()
             
-            lot_id = auction.get("currentLotId")
             asyncio.create_task(countdown_timer(auction_id, new_end_time, lot_id))
             
             logger.info(f"Anti-snipe triggered: timer extended to {new_end_time}")
+            
+            # Emit anti-snipe event with new timer
+            await sio.emit('anti_snipe', create_timer_event(lot_id, int(new_end_time.timestamp() * 1000)), room=f"auction_{auction_id}")
         
         # Emit bid event
         await sio.emit('new_bid', {
@@ -856,7 +860,8 @@ async def start_lot(auction_id: str, player_id: str):
             "auctionId": auction_id,
             "lotId": lot_id,
             "player": sanitize_mongo_doc(player),
-            "endsAt": int(end_time.timestamp() * 1000)
+            "endsAt": int(end_time.timestamp() * 1000),
+            "timer": create_timer_event(lot_id, int(end_time.timestamp() * 1000))
         }, room=f"auction_{auction_id}")
         
         logger.info("start_lot completed successfully")
@@ -898,13 +903,19 @@ async def complete_lot(auction_id: str):
         
         logger.info(f"Player {current_player_id} awarded to {highest_bid['userName']} for {highest_bid['amount']}")
         
-        # Emit lot completed
-        await sio.emit('lot_completed', {
+        # Emit lot sold
+        await sio.emit('sold', {
             "auctionId": auction_id,
             "playerId": current_player_id,
             "winnerId": highest_bid["userId"],
             "winnerName": highest_bid["userName"],
-            "amount": highest_bid["amount"]
+            "amount": highest_bid["amount"],
+            "unsold": False,
+            "winningBid": {
+                "userId": highest_bid["userId"],
+                "userName": highest_bid["userName"],
+                "amount": highest_bid["amount"]
+            }
         }, room=f"auction_{auction_id}")
     else:
         # No bids - player goes unsold
@@ -915,9 +926,10 @@ async def complete_lot(auction_id: str):
         
         logger.info(f"Player {current_player_id} went unsold")
         
-        await sio.emit('lot_no_sale', {
+        await sio.emit('sold', {
             "auctionId": auction_id,
-            "playerId": current_player_id
+            "playerId": current_player_id,
+            "unsold": True
         }, room=f"auction_{auction_id}")
     
     # Move to next player
@@ -968,8 +980,9 @@ async def start_next_lot(auction_id: str):
             
             logger.info(f"Auction {auction_id} completed")
             
-            await sio.emit('auction_completed', {
-                "auctionId": auction_id
+            await sio.emit('auction_complete', {
+                "auctionId": auction_id,
+                "message": "Auction complete! All players have been auctioned."
             }, room=f"auction_{auction_id}")
 
 async def countdown_timer(auction_id: str, end_time: datetime, lot_id: str):
@@ -990,11 +1003,8 @@ async def countdown_timer(auction_id: str, end_time: datetime, lot_id: str):
             # Emit timer tick every second
             remaining = int((end_time - datetime.now(timezone.utc)).total_seconds())
             if remaining <= 10:  # Only emit last 10 seconds to reduce traffic
-                await sio.emit('timer_tick', {
-                    "auctionId": auction_id,
-                    "lotId": lot_id,
-                    "remaining": remaining
-                }, room=f"auction_{auction_id}")
+                import time
+                await sio.emit('tick', create_timer_event(lot_id, int(end_time.timestamp() * 1000)), room=f"auction_{auction_id}")
         
         # Time's up - complete the lot
         await complete_lot(auction_id)
@@ -1093,6 +1103,40 @@ async def join_auction(sid, data):
     if auction.get("currentPlayerId"):
         current_player = await db.players.find_one({"id": auction.get("currentPlayerId")})
     
+    # Get current bids for this lot
+    current_bids = []
+    if auction.get("currentLotId"):
+        cursor = db.bids.find({
+            "auctionId": auction_id,
+            "lotId": auction.get("currentLotId")
+        }).sort("createdAt", -1).limit(10)
+        current_bids = await cursor.to_list(length=10)
+    
+    # Get competition participants with updated budgets
+    competition = await db.competitions.find_one({"id": auction.get("competitionId")})
+    participants = competition.get("participants", []) if competition else []
+    
+    # Create timer event if auction is active and has a current lot
+    timer_event = None
+    if auction.get("status") == "active" and auction.get("currentLotId") and auction.get("timerEndsAt"):
+        timer_ends_at = auction["timerEndsAt"]
+        if isinstance(timer_ends_at, datetime) and timer_ends_at.tzinfo is None:
+            timer_ends_at = timer_ends_at.replace(tzinfo=timezone.utc)
+        timer_event = create_timer_event(
+            auction.get("currentLotId"),
+            int(timer_ends_at.timestamp() * 1000)
+        )
+    
+    # Send sync_state for full synchronization (includes timer for useAuctionClock)
+    await sio.emit('sync_state', {
+        "auction": sanitize_mongo_doc(auction),
+        "currentPlayer": sanitize_mongo_doc(current_player),
+        "currentBids": [sanitize_mongo_doc(bid) for bid in current_bids],
+        "participants": participants,
+        "timer": timer_event
+    }, room=sid)
+    
+    # Also send auction_state for backward compatibility
     await sio.emit('auction_state', {
         "auction": sanitize_mongo_doc(auction),
         "currentPlayer": sanitize_mongo_doc(current_player)

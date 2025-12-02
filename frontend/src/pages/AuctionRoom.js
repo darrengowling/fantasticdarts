@@ -127,7 +127,7 @@ export default function AuctionRoom() {
     const handleBidPlaced = (data) => {
       console.log("Bid placed event received:", data);
       console.log("Current bids before update:", bids);
-      console.log("Current club:", currentPlayer);
+      console.log("Current player:", currentPlayer);
       setBids((prev) => {
         const newBids = [data.bid, ...prev];
         console.log("New bids after update:", newBids);
@@ -413,15 +413,15 @@ export default function AuctionRoom() {
   }
 
   const isCommissioner = competition && user && competition.commissionerId === user.id;
-  const currentClubBids = currentPlayer ? bids.filter((b) => b.playerId === currentPlayer.id) : [];
+  const currentPlayerBids = currentPlayer ? bids.filter((b) => b.playerId === currentPlayer.id) : [];
   
   // Debug logging for bid display
   if (currentPlayer) {
     console.log("Current player ID:", currentPlayer.id);
     console.log("All bids:", bids);
-    console.log("Current player bids:", currentClubBids);
+    console.log("Current player bids:", currentPlayerBids);
   }
-  const highestBid = currentClubBids.length > 0 ? Math.max(...currentClubBids.map((b) => b.amount)) : 0;
+  const highestBid = currentPlayerBids.length > 0 ? Math.max(...currentPlayerBids.map((b) => b.amount)) : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 py-8">
@@ -550,8 +550,13 @@ export default function AuctionRoom() {
                   {/* Player Info */}
                   <div className="bg-gray-50 p-6 rounded-lg mb-6">
                     <h3 className="text-3xl font-bold text-gray-900 mb-2">{currentPlayer.name}</h3>
-                    <p className="text-xl text-gray-600">{currentPlayer.country}</p>
-                    <p className="text-sm text-gray-500 mt-2">UEFA ID: {currentPlayer.uefaId}</p>
+                    <p className="text-xl text-gray-600">{currentPlayer.nationality}</p>
+                    {currentPlayer.pdcRanking && (
+                      <p className="text-sm text-gray-500 mt-2">PDC Ranking: #{currentPlayer.pdcRanking}</p>
+                    )}
+                    {currentPlayer.seed && (
+                      <p className="text-sm text-gray-500">Seed: #{currentPlayer.seed}</p>
+                    )}
                   </div>
 
                   {/* Current Highest Bid */}
@@ -559,9 +564,9 @@ export default function AuctionRoom() {
                     <div className="bg-green-50 border border-green-200 p-4 rounded-lg mb-6">
                       <div className="text-sm text-gray-600">Current Highest Bid</div>
                       <div className="text-3xl font-bold text-green-600">£{highestBid.toLocaleString()}</div>
-                      {currentClubBids[0] && (
+                      {currentPlayerBids[0] && (
                         <div className="text-sm text-gray-600 mt-1">
-                          by {currentClubBids[0].userName}
+                          by {currentPlayerBids[0].userName}
                         </div>
                       )}
                     </div>
@@ -597,11 +602,11 @@ export default function AuctionRoom() {
                   <div className="mt-6">
                     <h4 className="font-semibold text-gray-900 mb-3">Bid History</h4>
                     <div className="max-h-64 overflow-y-auto">
-                      {currentClubBids.length === 0 ? (
+                      {currentPlayerBids.length === 0 ? (
                         <p className="text-gray-500">No bids yet</p>
                       ) : (
                         <div className="space-y-2">
-                          {currentClubBids
+                          {currentPlayerBids
                             .sort((a, b) => b.amount - a.amount)
                             .map((bid) => (
                               <div
@@ -636,9 +641,9 @@ export default function AuctionRoom() {
               )}
             </div>
 
-            {/* Clubs Overview */}
+            {/* Players Overview */}
             <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-xl font-bold mb-4 text-gray-900">All Clubs in Auction</h3>
+              <h3 className="text-xl font-bold mb-4 text-gray-900">All Players in Auction</h3>
               
               {/* Summary Stats */}
               <div className="grid grid-cols-2 gap-2 mb-4 text-sm">

@@ -424,7 +424,7 @@ export default function AuctionRoom() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-darts-bg-900 via-darts-bg-800 to-darts-dark-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
         <div className="text-white text-2xl">Loading auction...</div>
       </div>
     );
@@ -442,33 +442,33 @@ export default function AuctionRoom() {
   const highestBid = currentPlayerBids.length > 0 ? Math.max(...currentPlayerBids.map((b) => b.amount)) : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-darts-bg-900 via-darts-bg-800 to-darts-dark-900 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-8">
       <div className="container mx-auto px-4">
         <div className="max-w-6xl mx-auto">
           <button
             onClick={() => navigate("/")}
-            className="text-white hover:text-darts-gold-500 transition-colors mb-4 flex items-center gap-2 font-semibold"
+            className="text-white hover:text-yellow-400 transition-colors mb-4 flex items-center gap-2 font-semibold"
           >
             ← Back to Home
           </button>
 
           {/* Auction Header */}
-          <div className="bg-gradient-to-r from-darts-dark-800 to-darts-dark-900 rounded-xl shadow-2xl p-6 mb-6 border-2 border-darts-dark-700">
+          <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl shadow-2xl p-6 mb-6 border-2 border-gray-700">
             <div className="flex justify-between items-center">
               <div>
                 <h1 className="text-4xl font-bold text-white uppercase tracking-tight">
                   {competition ? competition.name : "Auction Room"}
                 </h1>
-                <p className="text-gray-300 font-semibold mt-2">
-                  Lot #{auction?.currentLot || 0} • Status: <span className="text-darts-gold-500">{auction?.status || "Unknown"}</span>
+                <p className="text-gray-200 font-semibold mt-2">
+                  Lot #{auction?.currentLot || 0} • Status: <span className="text-yellow-400">{auction?.status || "Unknown"}</span>
                   {auction?.status === "paused" && (
-                    <span className="ml-2 px-3 py-1 bg-darts-gold-500 text-darts-dark-900 text-sm rounded-full font-bold">PAUSED</span>
+                    <span className="ml-2 px-3 py-1 bg-yellow-500 text-gray-900 text-sm rounded-full font-bold">PAUSED</span>
                   )}
                   {auction?.status === "waiting" && (
-                    <span className="ml-2 px-3 py-1 bg-darts-green-500 text-white text-sm rounded-full font-bold">WAITING</span>
+                    <span className="ml-2 px-3 py-1 bg-green-500 text-white text-sm rounded-full font-bold">WAITING</span>
                   )}
                   {auction?.status === "active" && (
-                    <span className="ml-2 px-3 py-1 bg-darts-red-500 text-white text-sm rounded-full font-bold animate-pulse">LIVE</span>
+                    <span className="ml-2 px-3 py-1 bg-red-600 text-white text-sm rounded-full font-bold animate-pulse">LIVE</span>
                   )}
                 </p>
               </div>
@@ -517,7 +517,7 @@ export default function AuctionRoom() {
           </div>
 
           {/* Participant Budgets */}
-          <div className="bg-gradient-to-r from-darts-dark-800 to-darts-dark-900 rounded-xl shadow-2xl p-6 mb-6 border-2 border-darts-dark-700">
+          <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl shadow-2xl p-6 mb-6 border-2 border-gray-700">
             <h2 className="text-2xl font-bold mb-4 text-white uppercase tracking-wide">Manager Budgets</h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
               {participants.map((p) => {
@@ -529,35 +529,35 @@ export default function AuctionRoom() {
                     key={p.userId}
                     className={`p-5 rounded-xl border-2 transform transition-all duration-200 ${
                       isCurrentUser
-                        ? "bg-gradient-to-br from-darts-gold-600 to-darts-gold-700 border-darts-gold-500 shadow-xl scale-105"
-                        : "bg-darts-bg-800 border-darts-dark-700 hover:border-darts-dark-600"
+                        ? "bg-gradient-to-br from-yellow-500 to-yellow-600 border-yellow-400 shadow-xl scale-105"
+                        : "bg-gray-700 border-gray-600 hover:border-gray-500"
                     }`}
                   >
-                    <div className={`font-bold text-sm mb-2 ${isCurrentUser ? 'text-white' : 'text-gray-300'}`}>
+                    <div className={`font-bold text-sm mb-2 ${isCurrentUser ? 'text-gray-900' : 'text-white'}`}>
                       {p.userName} {isCurrentUser && "⭐"}
                     </div>
-                    <div className={`text-3xl font-bold ${isCurrentUser ? 'text-white' : 'text-darts-green-500'}`}>
+                    <div className={`text-3xl font-bold ${isCurrentUser ? 'text-gray-900' : 'text-green-400'}`}>
                       £{p.budgetRemaining.toLocaleString()}
                     </div>
                     
                     {/* Budget progress bar */}
                     <div className="mt-3 mb-2">
-                      <div className="h-2 bg-darts-dark-900 rounded-full overflow-hidden">
+                      <div className="h-2 bg-gray-900 rounded-full overflow-hidden">
                         <div 
                           className={`h-full transition-all duration-500 ${
-                            budgetPercent > 50 ? 'bg-darts-green-500' : 
-                            budgetPercent > 25 ? 'bg-darts-gold-500' : 
-                            'bg-darts-red-500'
+                            budgetPercent > 50 ? 'bg-green-500' : 
+                            budgetPercent > 25 ? 'bg-yellow-500' : 
+                            'bg-red-500'
                           }`}
                           style={{ width: `${budgetPercent}%` }}
                         />
                       </div>
                     </div>
                     
-                    <div className={`text-xs mt-2 ${isCurrentUser ? 'text-white/90' : 'text-gray-400'}`}>
+                    <div className={`text-xs mt-2 ${isCurrentUser ? 'text-gray-900' : 'text-gray-300'}`}>
                       Spent: £{p.totalSpent.toLocaleString()}
                     </div>
-                    <div className={`text-xs ${isCurrentUser ? 'text-white/90' : 'text-gray-400'}`}>
+                    <div className={`text-xs ${isCurrentUser ? 'text-gray-900' : 'text-gray-300'}`}>
                       Players: {p.playersWon.length}
                     </div>
                   </div>
@@ -580,16 +580,16 @@ export default function AuctionRoom() {
                     const ss = String(s % 60).padStart(2, "0");
                     
                     // Determine urgency state
-                    let timerClass = 'bg-darts-green-600 border-darts-green-700'; // Calm (20-30s)
+                    let timerClass = 'bg-green-600 border-green-700'; // Calm (20-30s)
                     let animation = '';
                     
                     if (s < 10) {
                       // Urgent: Red with fast pulse
-                      timerClass = 'bg-darts-red-600 border-darts-red-700';
+                      timerClass = 'bg-red-600 border-red-700';
                       animation = 'animate-pulse-fast';
                     } else if (s < 20) {
                       // Warning: Gold with slow pulse
-                      timerClass = 'bg-darts-gold-500 border-darts-gold-600';
+                      timerClass = 'bg-yellow-500 border-yellow-600';
                       animation = 'animate-pulse-slow';
                     }
                     
@@ -678,8 +678,8 @@ export default function AuctionRoom() {
               ) : (
                 <div className="text-center py-12">
                   {auction?.status === "waiting" ? (
-                    // Waiting Room - Polished
-                    <div className="bg-gradient-to-br from-darts-bg-900 to-darts-bg-800 p-12 rounded-2xl border-2 border-darts-dark-700 shadow-2xl">
+                    // Waiting Room - High Contrast Fix
+                    <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-12 rounded-2xl border-2 border-gray-600 shadow-2xl">
                       <div className="text-center">
                         {/* Animated icon */}
                         <div className="text-8xl mb-6 animate-pulse-slow">🎯</div>
@@ -688,7 +688,7 @@ export default function AuctionRoom() {
                           Auction Lobby
                         </h2>
                         
-                        <p className="text-2xl text-gray-300 mb-8 font-medium">
+                        <p className="text-2xl text-gray-100 mb-8 font-medium">
                           {isCommissioner 
                             ? "Managers are gathering... Start when ready!" 
                             : "Waiting for commissioner to begin the action"}
@@ -696,17 +696,17 @@ export default function AuctionRoom() {
                         </p>
 
                         {/* Participants Grid */}
-                        <div className="bg-darts-bg-800 rounded-xl p-6 mb-8 border border-darts-dark-700">
-                          <div className="text-darts-gold-500 font-bold text-lg uppercase tracking-wide mb-4">
+                        <div className="bg-gray-800 rounded-xl p-6 mb-8 border-2 border-gray-600">
+                          <div className="text-yellow-400 font-bold text-lg uppercase tracking-wide mb-4">
                             Managers Ready ({participants.length})
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             {participants.map((p) => (
                               <div 
                                 key={p.userId} 
-                                className="flex items-center justify-center gap-2 bg-darts-dark-800 px-4 py-3 rounded-lg border border-darts-green-600"
+                                className="flex items-center justify-center gap-2 bg-gray-700 px-4 py-3 rounded-lg border-2 border-green-500"
                               >
-                                <span className="text-darts-green-500 text-xl">✓</span>
+                                <span className="text-green-400 text-xl">✓</span>
                                 <span className="text-white font-semibold">{p.userName}</span>
                               </div>
                             ))}
@@ -715,27 +715,27 @@ export default function AuctionRoom() {
 
                         {/* Quick Facts */}
                         <div className="grid grid-cols-3 gap-4 mb-8">
-                          <div className="bg-darts-dark-800 p-4 rounded-lg border border-darts-dark-700">
-                            <div className="text-3xl font-bold text-darts-gold-500">
+                          <div className="bg-gray-800 p-4 rounded-lg border-2 border-gray-600">
+                            <div className="text-3xl font-bold text-yellow-400">
                               {players.length || 32}
                             </div>
-                            <div className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                            <div className="text-xs text-gray-300 uppercase tracking-wide mt-1">
                               Players
                             </div>
                           </div>
-                          <div className="bg-darts-dark-800 p-4 rounded-lg border border-darts-dark-700">
-                            <div className="text-3xl font-bold text-darts-green-500">
+                          <div className="bg-gray-800 p-4 rounded-lg border-2 border-gray-600">
+                            <div className="text-3xl font-bold text-green-400">
                               £100k
                             </div>
-                            <div className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                            <div className="text-xs text-gray-300 uppercase tracking-wide mt-1">
                               Budget
                             </div>
                           </div>
-                          <div className="bg-darts-dark-800 p-4 rounded-lg border border-darts-dark-700">
-                            <div className="text-3xl font-bold text-darts-red-500">
+                          <div className="bg-gray-800 p-4 rounded-lg border-2 border-gray-600">
+                            <div className="text-3xl font-bold text-red-400">
                               30s
                             </div>
-                            <div className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+                            <div className="text-xs text-gray-300 uppercase tracking-wide mt-1">
                               Per Lot
                             </div>
                           </div>
@@ -754,7 +754,7 @@ export default function AuctionRoom() {
                                 alert("Error beginning bidding: " + (e.response?.data?.detail || e.message));
                               }
                             }}
-                            className="bg-gradient-to-r from-darts-green-600 to-darts-green-700 text-white px-12 py-6 rounded-xl hover:from-darts-green-700 hover:to-darts-green-800 font-bold text-2xl shadow-2xl transform hover:scale-105 transition-all duration-200 uppercase tracking-wide border-2 border-darts-green-500 animate-glow"
+                            className="bg-gradient-to-r from-green-600 to-green-700 text-white px-12 py-6 rounded-xl hover:from-green-700 hover:to-green-800 font-bold text-2xl shadow-2xl transform hover:scale-105 transition-all duration-200 uppercase tracking-wide border-2 border-green-500"
                           >
                             🚀 BEGIN THE ACTION
                           </button>
@@ -762,7 +762,7 @@ export default function AuctionRoom() {
                         
                         {/* Participant waiting message */}
                         {!isCommissioner && (
-                          <div className="text-gray-400 text-lg italic">
+                          <div className="text-gray-300 text-lg italic">
                             The commissioner will start the auction shortly
                           </div>
                         )}

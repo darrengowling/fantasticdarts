@@ -34,15 +34,15 @@ export default function PlayerCard({ player, className = '' }) {
   // Determine seed badge color
   const getSeedBadgeColor = (seed) => {
     if (!seed) return null;
-    if (seed <= 8) return 'bg-darts-gold-500 text-white'; // Top 8
-    if (seed <= 16) return 'bg-darts-gold-600 text-white'; // Top 16
+    if (seed <= 8) return 'bg-yellow-500 text-gray-900'; // Top 8
+    if (seed <= 16) return 'bg-yellow-600 text-white'; // Top 16
     return 'bg-gray-600 text-white'; // 17-32
   };
 
   const seedBadgeColor = getSeedBadgeColor(player.seed);
 
   return (
-    <div className={`bg-gradient-to-br from-darts-bg-800 to-darts-bg-900 rounded-2xl p-8 shadow-2xl border-2 border-darts-dark-700 ${className}`}>
+    <div className={`bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 shadow-2xl border-2 border-gray-600 ${className}`}>
       {/* Header with badges */}
       <div className="flex justify-between items-start mb-6">
         {/* Seed badge */}
@@ -54,7 +54,7 @@ export default function PlayerCard({ player, className = '' }) {
         
         {/* PDC Ranking badge */}
         {player.pdcRanking && (
-          <div className="bg-darts-red-600 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg">
+          <div className="bg-red-600 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg">
             RANK #{player.pdcRanking}
           </div>
         )}
@@ -76,13 +76,13 @@ export default function PlayerCard({ player, className = '' }) {
 
       {/* Stats row (if available) */}
       {player.stats && (
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-darts-dark-700">
+        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-600">
           {player.stats.titles && (
             <div className="text-center">
-              <div className="text-3xl font-bold text-darts-gold-500">
+              <div className="text-3xl font-bold text-yellow-400">
                 {player.stats.titles}
               </div>
-              <div className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+              <div className="text-xs text-gray-300 uppercase tracking-wide mt-1">
                 Titles
               </div>
             </div>
@@ -90,10 +90,10 @@ export default function PlayerCard({ player, className = '' }) {
           
           {player.stats.average && (
             <div className="text-center">
-              <div className="text-3xl font-bold text-darts-green-500">
+              <div className="text-3xl font-bold text-green-400">
                 {player.stats.average}
               </div>
-              <div className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+              <div className="text-xs text-gray-300 uppercase tracking-wide mt-1">
                 Avg
               </div>
             </div>
@@ -101,10 +101,10 @@ export default function PlayerCard({ player, className = '' }) {
           
           {player.stats.highCheckout && (
             <div className="text-center">
-              <div className="text-3xl font-bold text-darts-red-500">
+              <div className="text-3xl font-bold text-red-400">
                 {player.stats.highCheckout}
               </div>
-              <div className="text-xs text-gray-400 uppercase tracking-wide mt-1">
+              <div className="text-xs text-gray-300 uppercase tracking-wide mt-1">
                 High CO
               </div>
             </div>
@@ -118,12 +118,12 @@ export default function PlayerCard({ player, className = '' }) {
           <img 
             src={player.profileImageUrl} 
             alt={player.name}
-            className="w-32 h-32 rounded-full border-4 border-darts-gold-500 shadow-xl object-cover"
+            className="w-32 h-32 rounded-full border-4 border-yellow-500 shadow-xl object-cover"
           />
         </div>
       ) : (
         <div className="mt-6 flex justify-center">
-          <div className="w-32 h-32 rounded-full border-4 border-darts-dark-700 bg-darts-dark-800 flex items-center justify-center shadow-xl">
+          <div className="w-32 h-32 rounded-full border-4 border-gray-600 bg-gray-700 flex items-center justify-center shadow-xl">
             <span className="text-5xl">🎯</span>
           </div>
         </div>
